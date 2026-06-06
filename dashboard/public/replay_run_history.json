@@ -1,0 +1,274 @@
+{
+  "run_id": "hololab-demo-run-001",
+  "run_name": "baseline-churn-mlp",
+  "dataset": "churn.csv",
+  "model": "MLP 3-layer",
+  "config": {
+    "lr": 0.001,
+    "batch_size": 32,
+    "epochs": 30,
+    "hidden": [
+      64,
+      32
+    ]
+  },
+  "best_step": 90,
+  "status": "finished",
+  "history": [
+    {
+      "step": 0,
+      "train_loss": 1.248,
+      "val_loss": 1.3041,
+      "train_acc": 0.1264,
+      "val_acc": 0.0871,
+      "lr": 0.001
+    },
+    {
+      "step": 5,
+      "train_loss": 1.1072,
+      "val_loss": 1.1534,
+      "train_acc": 0.225,
+      "val_acc": 0.1926,
+      "lr": 0.000951
+    },
+    {
+      "step": 10,
+      "train_loss": 0.9771,
+      "val_loss": 1.0246,
+      "train_acc": 0.316,
+      "val_acc": 0.2828,
+      "lr": 0.000905
+    },
+    {
+      "step": 15,
+      "train_loss": 0.8836,
+      "val_loss": 0.9387,
+      "train_acc": 0.3815,
+      "val_acc": 0.3429,
+      "lr": 0.000861
+    },
+    {
+      "step": 20,
+      "train_loss": 0.7861,
+      "val_loss": 0.8391,
+      "train_acc": 0.4497,
+      "val_acc": 0.4126,
+      "lr": 0.000819
+    },
+    {
+      "step": 25,
+      "train_loss": 0.6955,
+      "val_loss": 0.7477,
+      "train_acc": 0.5132,
+      "val_acc": 0.4766,
+      "lr": 0.000779
+    },
+    {
+      "step": 30,
+      "train_loss": 0.6035,
+      "val_loss": 0.6638,
+      "train_acc": 0.5775,
+      "val_acc": 0.5354,
+      "lr": 0.000741
+    },
+    {
+      "step": 35,
+      "train_loss": 0.5543,
+      "val_loss": 0.6103,
+      "train_acc": 0.612,
+      "val_acc": 0.5728,
+      "lr": 0.000705
+    },
+    {
+      "step": 40,
+      "train_loss": 0.4779,
+      "val_loss": 0.507,
+      "train_acc": 0.6655,
+      "val_acc": 0.6451,
+      "lr": 0.00067
+    },
+    {
+      "step": 45,
+      "train_loss": 0.4325,
+      "val_loss": 0.4768,
+      "train_acc": 0.6973,
+      "val_acc": 0.6662,
+      "lr": 0.000638
+    },
+    {
+      "step": 50,
+      "train_loss": 0.3962,
+      "val_loss": 0.4457,
+      "train_acc": 0.7226,
+      "val_acc": 0.688,
+      "lr": 0.000607
+    },
+    {
+      "step": 55,
+      "train_loss": 0.3576,
+      "val_loss": 0.3999,
+      "train_acc": 0.7497,
+      "val_acc": 0.7201,
+      "lr": 0.000577
+    },
+    {
+      "step": 60,
+      "train_loss": 0.3202,
+      "val_loss": 0.375,
+      "train_acc": 0.7758,
+      "val_acc": 0.7375,
+      "lr": 0.000549
+    },
+    {
+      "step": 65,
+      "train_loss": 0.281,
+      "val_loss": 0.3516,
+      "train_acc": 0.8033,
+      "val_acc": 0.7539,
+      "lr": 0.000522
+    },
+    {
+      "step": 70,
+      "train_loss": 0.263,
+      "val_loss": 0.3273,
+      "train_acc": 0.8159,
+      "val_acc": 0.7709,
+      "lr": 0.000497
+    },
+    {
+      "step": 75,
+      "train_loss": 0.2291,
+      "val_loss": 0.2702,
+      "train_acc": 0.8397,
+      "val_acc": 0.8109,
+      "lr": 0.000472
+    },
+    {
+      "step": 80,
+      "train_loss": 0.2096,
+      "val_loss": 0.2584,
+      "train_acc": 0.8532,
+      "val_acc": 0.8191,
+      "lr": 0.000449
+    },
+    {
+      "step": 85,
+      "train_loss": 0.1984,
+      "val_loss": 0.2514,
+      "train_acc": 0.8611,
+      "val_acc": 0.824,
+      "lr": 0.000427
+    },
+    {
+      "step": 90,
+      "train_loss": 0.1729,
+      "val_loss": 0.2114,
+      "train_acc": 0.879,
+      "val_acc": 0.852,
+      "lr": 0.000407
+    },
+    {
+      "step": 95,
+      "train_loss": 0.1575,
+      "val_loss": 0.2111,
+      "train_acc": 0.8898,
+      "val_acc": 0.8522,
+      "lr": 0.000387
+    },
+    {
+      "step": 100,
+      "train_loss": 0.142,
+      "val_loss": 0.2194,
+      "train_acc": 0.9006,
+      "val_acc": 0.8464,
+      "lr": 0.000368
+    },
+    {
+      "step": 105,
+      "train_loss": 0.1403,
+      "val_loss": 0.2186,
+      "train_acc": 0.9018,
+      "val_acc": 0.847,
+      "lr": 0.00035
+    },
+    {
+      "step": 110,
+      "train_loss": 0.1271,
+      "val_loss": 0.2722,
+      "train_acc": 0.911,
+      "val_acc": 0.8095,
+      "lr": 0.000333
+    },
+    {
+      "step": 115,
+      "train_loss": 0.1016,
+      "val_loss": 0.2726,
+      "train_acc": 0.9289,
+      "val_acc": 0.8092,
+      "lr": 0.000317
+    },
+    {
+      "step": 120,
+      "train_loss": 0.1089,
+      "val_loss": 0.2867,
+      "train_acc": 0.9238,
+      "val_acc": 0.7993,
+      "lr": 0.000301
+    },
+    {
+      "step": 125,
+      "train_loss": 0.1067,
+      "val_loss": 0.3157,
+      "train_acc": 0.9253,
+      "val_acc": 0.779,
+      "lr": 0.000287
+    },
+    {
+      "step": 130,
+      "train_loss": 0.0848,
+      "val_loss": 0.3464,
+      "train_acc": 0.9406,
+      "val_acc": 0.7575,
+      "lr": 0.000273
+    },
+    {
+      "step": 135,
+      "train_loss": 0.0964,
+      "val_loss": 0.3678,
+      "train_acc": 0.9325,
+      "val_acc": 0.7425,
+      "lr": 0.000259
+    },
+    {
+      "step": 140,
+      "train_loss": 0.0978,
+      "val_loss": 0.3808,
+      "train_acc": 0.9316,
+      "val_acc": 0.7334,
+      "lr": 0.000247
+    },
+    {
+      "step": 145,
+      "train_loss": 0.0829,
+      "val_loss": 0.3809,
+      "train_acc": 0.9419,
+      "val_acc": 0.7334,
+      "lr": 0.000235
+    },
+    {
+      "step": 150,
+      "train_loss": 0.0831,
+      "val_loss": 0.4091,
+      "train_acc": 0.9418,
+      "val_acc": 0.7136,
+      "lr": 0.000223
+    }
+  ],
+  "summary": {
+    "best_val_loss": 0.2111,
+    "final_train_loss": 0.0831,
+    "final_val_loss": 0.4091,
+    "overfit_detected_at_step": 90,
+    "verdict": "Model overfits after step 90. val_loss diverges from train_loss by +0.24 at step 150. Recommend early stopping at step 90."
+  }
+}

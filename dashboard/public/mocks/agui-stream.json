@@ -1,0 +1,17 @@
+[
+  { "type": "RUN_STARTED", "agent": "router", "ts": 0, "message": "Received query: which columns are skewed?" },
+  { "type": "TEXT_MESSAGE_CONTENT", "agent": "router", "ts": 200, "message": "Routing to EDA agent..." },
+  { "type": "HANDOFF", "agent": "router", "to": "eda", "ts": 400, "message": "Handing off to EDA agent" },
+  { "type": "TOOL_CALL_START", "agent": "eda", "tool": "profile_dataset", "args": { "path": "data/housing.csv" }, "ts": 600 },
+  { "type": "TOOL_CALL_END", "agent": "eda", "tool": "profile_dataset", "result": "12 columns profiled", "ts": 1200 },
+  { "type": "TOOL_CALL_START", "agent": "eda", "tool": "render_plot", "args": { "col": "price", "kind": "histogram" }, "ts": 1400 },
+  { "type": "TOOL_CALL_END", "agent": "eda", "tool": "render_plot", "result": "panel generated", "ts": 1800 },
+  { "type": "TOOL_CALL_START", "agent": "eda", "tool": "flag_columns", "args": {}, "ts": 1900 },
+  { "type": "TOOL_CALL_END", "agent": "eda", "tool": "flag_columns", "result": "3 columns flagged: price, income, balance", "ts": 2100 },
+  { "type": "STATE_DELTA", "agent": "eda", "ts": 2200, "message": "Findings written to Redis" },
+  { "type": "HANDOFF", "agent": "eda", "to": "narrator", "ts": 2400, "message": "Handing off to narrator" },
+  { "type": "TOOL_CALL_START", "agent": "narrator", "tool": "get_eval_results", "args": {}, "ts": 2600 },
+  { "type": "TOOL_CALL_END", "agent": "narrator", "tool": "get_eval_results", "result": "report ready", "ts": 2900 },
+  { "type": "TEXT_MESSAGE_CONTENT", "agent": "narrator", "ts": 3100, "message": "Three columns are right-skewed: price, income, balance. Consider log-transform." },
+  { "type": "RUN_FINISHED", "agent": "narrator", "ts": 3300, "message": "Run complete" }
+]

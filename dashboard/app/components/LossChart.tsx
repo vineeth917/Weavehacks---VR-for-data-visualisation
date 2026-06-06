@@ -1,0 +1,236 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+
+interface HistoryPoint {
+  step: number;
+  train_loss: number;
+  val_loss: number;
+  train_acc: number;
+  val_acc: number;
+}
+
+interface RunMeta {
+  run_id: string;
+  run_name: string;
+  dataset: string;
+  model: string;
+  best_step: number;
+  status: string;
+  summary: {
+    verdict: string;
+    overfit_detected_at_step: number;
+    best_val_loss: number;
+  };
+  history: HistoryPoint[];
+}
+
+// Custom tooltip so it looks sharp on the projector
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-xs">
+      <p className="text-gray-400 mb-1">step {label}</p>
+      {payload.map((p: any) => (
+        <p key={p.dataKey} style={{ color: p.color }}>
+          {p.name}: {p.value.toFixed(4)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export function LossChart() {
+  const [allData, setAllData] = useState<HistoryPoint[]>([]);
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showVerdict, setShowVerdict] = useState(false);
+  const [meta, setMeta] = useState<RunMeta | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    fetch("/replay_run_history.json")
+      .then((r) => r.json())
+      .then((data: RunMeta) => {
+        setMeta(data);
+        setAllData(data.history);
+      });
+  }, []);
+
+  const visibleData = allData.slice(0, visibleCount);
+  const overfitStep = meta?.best_step ?? 90;
+  const overfitVisible =
+    visibleData.length > 0 && visibleData[visibleData.length - 1].step >= overfitStep;
+
+  function play() {
+    if (isPlaying) return;
+    setVisibleCount(0);
+    setShowVerdict(false);
+    setIsPlaying(true);
+
+    let i = 0;
+    timerRef.current = setInterval(() => {
+      i++;
+      setVisibleCount(i);
+      if (i >= allData.length) {
+        clearInterval(timerRef.current!);
+        setIsPlaying(false);
+        setTimeout(() => setShowVerdict(true), 600);
+      }
+    }, 140);
+  }
+
+  function reset() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsPlaying(false);
+    setVisibleCount(0);
+    setShowVerdict(false);
+  }
+
+  // Stream one point at a time when training_update events arrive from the real backend
+  // (parent can call this via ref — for now auto-play on mount after a delay)
+  useEffect(() => {
+    if (allData.length > 0) {
+      const t = setTimeout(() => play(), 1200);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allData.length]);
+
+  return (
+    <div className="rounded-xl bg-gray-900 border border-gray-700 p-4 flex flex-col gap-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
+            Training Monitor
+          </p>
+          {meta && (
+            <p className="text-gray-400 text-xs mt-0.5">
+              {meta.run_name} · {meta.model} · {meta.dataset}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={play}
+            disabled={isPlaying}
+            className="text-xs px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 disabled:opacity-40 transition-colors"
+          >
+            {isPlaying ? "streaming..." : "▶ replay"}
+          </button>
+          <button
+            onClick={reset}
+            className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-gray-400 hover:bg-gray-700 transition-colors"
+          >
+            ↺
+          </button>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div style={{ height: 200 }}>
+        {visibleData.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-gray-600 text-sm">
+            Waiting for training data...
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={visibleData} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+              <XAxis
+                dataKey="step"
+                tick={{ fill: "#6b7280", fontSize: 10 }}
+                tickLine={false}
+                label={{ value: "step", position: "insideBottomRight", offset: 0, fill: "#4b5563", fontSize: 10 }}
+              />
+              <YAxis
+                tick={{ fill: "#6b7280", fontSize: 10 }}
+                tickLine={false}
+                domain={["auto", "auto"]}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend
+                wrapperStyle={{ fontSize: 11, color: "#9ca3af" }}
+                iconType="circle"
+                iconSize={8}
+              />
+
+              {/* Overfitting reference line */}
+              {overfitVisible && (
+                <ReferenceLine
+                  x={overfitStep}
+                  stroke="#f59e0b"
+                  strokeDasharray="4 2"
+                  label={{
+                    value: "overfit →",
+                    position: "top",
+                    fill: "#f59e0b",
+                    fontSize: 10,
+                  }}
+                />
+              )}
+
+              <Line
+                type="monotone"
+                dataKey="train_loss"
+                name="train loss"
+                stroke="#6366f1"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="val_loss"
+                name="val loss"
+                stroke="#f43f5e"
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Verdict banner */}
+      {showVerdict && meta?.summary && (
+        <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-3 py-2 flex items-start gap-2">
+          <span className="text-yellow-400 text-sm mt-0.5">⚠</span>
+          <div>
+            <p className="text-yellow-300 text-xs font-semibold">
+              Training Monitor verdict
+            </p>
+            <p className="text-yellow-200/80 text-xs mt-0.5">
+              {meta.summary.verdict}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Live step indicator */}
+      {isPlaying && visibleData.length > 0 && (
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span
+            className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"
+          />
+          step {visibleData[visibleData.length - 1].step} ·{" "}
+          train {visibleData[visibleData.length - 1].train_loss.toFixed(4)} ·{" "}
+          val {visibleData[visibleData.length - 1].val_loss.toFixed(4)}
+        </div>
+      )}
+    </div>
+  );
+}
