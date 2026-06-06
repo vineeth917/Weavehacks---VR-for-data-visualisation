@@ -42,9 +42,10 @@
     import { onMessage } from './src/ws.js';
     import { sendQuery } from './src/ws.js';
     import { renderPanels, highlightPanel } from './src/panels.js';
-    import { renderScatter, clearScatter } from './src/scatter3d.js';
+    import { renderScatter, clearScatter, initInteractions } from './src/scatter3d.js';
     import { initRibbon, addTrainingStep, clearRibbon } from './src/loss_ribbon.js';
     import { initVoice, speak, stopSpeaking } from './src/voice.js';
+    import { renderKDESurface, renderCorrField, clearRenderers } from './src/renderers.js';
 
     initScene();
 
@@ -59,6 +60,8 @@
     });
     onMessage('speech', (msg) => speak(msg.text));
     onMessage('report', (msg) => speak(msg.speak ? msg.verdict : ''));
+    onMessage('kde_surface', (msg) => renderKDESurface(msg));
+    onMessage('corr_field', (msg) => renderCorrField(msg));
   </script>
 </body>
 </html>

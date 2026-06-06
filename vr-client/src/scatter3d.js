@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { scene } from './scene.js';
+import { scene, camera, renderer } from './scene.js';
+import { sendCommand } from './ws.js';
 
 let scatterGroup = null;
 
@@ -60,6 +61,37 @@ export function clearScatter() {
   }
 }
 
+export function initInteractions(camera, renderer) {
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+
+  renderer.domElement.addEventListener('click', (event) => {
+    if (!scatterGroup) return;
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const meshes = scatterGroup.children.filter((child) => child instanceof THREE.Mesh);
+    const intersects = raycaster.intersectObjects(meshes);
+
+    if (intersects.length > 0) {
+      const { label, id } = intersects[0].object.userData;
+      const targetId = id || label;
+
+      sendCommand('interaction', {
+        type: 'interaction',
+        action: 'select_point',
+        target_id: targetId,
+        session_id: 's1',
+      });
+
+      console.log('Selected point:', { label, id: targetId });
+    }
+  });
+}
+
 export function renderScatter(msg) {
   clearScatter();
 
@@ -99,4 +131,5 @@ export function renderScatter(msg) {
   });
 
   scene.add(scatterGroup);
+  initInteractions(camera, renderer);
 }

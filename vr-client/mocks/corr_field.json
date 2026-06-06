@@ -1,0 +1,11 @@
+{
+  "type": "corr_field",
+  "title": "Correlation Matrix",
+  "labels": ["price","income","balance","age"],
+  "matrix": [
+    [1.0,  0.72, -0.31, 0.15],
+    [0.72, 1.0,  -0.18, 0.42],
+    [-0.31,-0.18, 1.0, -0.55],
+    [0.15, 0.42, -0.55, 1.0]
+  ]
+}
