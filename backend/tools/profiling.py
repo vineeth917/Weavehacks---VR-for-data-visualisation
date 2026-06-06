@@ -20,7 +20,7 @@ import pandas as pd
 SKEW_RIGHT = 1.0
 SKEW_LEFT = -1.0
 HEAVY_MISSING_PCT = 20.0
-NEAR_CONSTANT_UNIQUE_FRAC = 0.01        # unique/n_rows ≤ 1%
+NEAR_CONSTANT_DOMINANT_FRAC = 0.95      # dominant non-null value covers ≥ 95%
 HIGH_CARDINALITY_UNIQUE_FRAC = 0.95     # likely ID-like
 OUTLIER_PCT_FLAG = 5.0                  # IQR outliers > 5% → flag
 
@@ -103,8 +103,14 @@ def profile_column(s: pd.Series) -> ColumnProfile:
     flags: list[str] = []
     if missing_pct >= HEAVY_MISSING_PCT:
         flags.append("heavy_missing")
-    if n and unique <= max(1, int(n * NEAR_CONSTANT_UNIQUE_FRAC)):
-        flags.append("near_constant")
+    # near_constant: dominant *non-null* value covers >= 95% of non-null rows.
+    # This catches "all zeros except a few" without flagging healthy low-cardinality
+    # categoricals (e.g. 4 evenly-distributed classes).
+    nn = s.dropna()
+    if len(nn):
+        vc = nn.value_counts()
+        if float(vc.iloc[0]) / float(len(nn)) >= NEAR_CONSTANT_DOMINANT_FRAC:
+            flags.append("near_constant")
     if n and unique >= int(n * HIGH_CARDINALITY_UNIQUE_FRAC) and unique > 50:
         flags.append("high_cardinality")
     sk = col.get("skew")

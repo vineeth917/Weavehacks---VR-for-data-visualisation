@@ -80,6 +80,10 @@ near  = set(flag_columns(prof, "near_constant"))
 (passed if "flag_v1" in near else failed)(
     f"near_constant contains flag_v1 (got {near})"
 )
+# Regression: category (4 evenly distributed classes) must NOT be near_constant
+(passed if "category" not in near else failed)(
+    f"near_constant does NOT contain category (got {near})"
+)
 corr_pairs = {(p["a"], p["b"]) for p in prof["top_correlations"]} | \
              {(p["b"], p["a"]) for p in prof["top_correlations"]}
 (passed if ("pca1", "pca2") in corr_pairs else failed)(
