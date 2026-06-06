@@ -40,9 +40,11 @@
     import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/webxr/VRButton.js';
     import { initScene } from './src/scene.js';
     import { onMessage } from './src/ws.js';
+    import { sendQuery } from './src/ws.js';
     import { renderPanels, highlightPanel } from './src/panels.js';
     import { renderScatter, clearScatter } from './src/scatter3d.js';
     import { initRibbon, addTrainingStep, clearRibbon } from './src/loss_ribbon.js';
+    import { initVoice, speak, stopSpeaking } from './src/voice.js';
 
     initScene();
 
@@ -51,6 +53,12 @@
     onMessage('scatter3d', (msg) => renderScatter(msg));
     initRibbon();
     onMessage('training_update', (msg) => addTrainingStep(msg));
+    initVoice((transcript) => {
+      console.log('Voice query:', transcript);
+      sendQuery(transcript);
+    });
+    onMessage('speech', (msg) => speak(msg.text));
+    onMessage('report', (msg) => speak(msg.speak ? msg.verdict : ''));
   </script>
 </body>
 </html>
