@@ -39,8 +39,13 @@
     import * as THREE from 'three';
     import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/webxr/VRButton.js';
     import { initScene } from './src/scene.js';
+    import { onMessage } from './src/ws.js';
+    import { renderPanels, highlightPanel } from './src/panels.js';
 
     initScene();
+
+    onMessage('panels', (msg) => renderPanels(msg));
+    onMessage('highlight', (msg) => highlightPanel(msg.target_ids));
   </script>
 </body>
 </html>
