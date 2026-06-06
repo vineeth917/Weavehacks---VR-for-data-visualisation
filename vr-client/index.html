@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VR Data Visualisation</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js"
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: black;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #mic-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: white;
+      background: #333;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <button id="mic-btn">Enable Mic</button>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/webxr/VRButton.js';
+    import { initScene } from './src/scene.js';
+
+    initScene();
+  </script>
+</body>
+</html>
