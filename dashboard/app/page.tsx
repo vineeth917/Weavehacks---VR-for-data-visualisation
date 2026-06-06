@@ -6,6 +6,7 @@ import { AgentStatusGrid } from "./components/AgentStatusGrid";
 import { SwarmGraph } from "./components/SwarmGraph";
 import { StatsBar } from "./components/StatsBar";
 import { LossChart } from "./components/LossChart";
+import { A2UIPanel } from "./components/A2UIPanel";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8080";
 
@@ -35,8 +36,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main grid: 3 columns */}
-      <div className="flex-1 grid grid-cols-3 gap-3 min-h-0">
+      {/* Main grid: 4 columns */}
+      <div className="flex-1 grid grid-cols-4 gap-3 min-h-0">
 
         {/* Col 1: Swarm graph + agent status */}
         <div className="flex flex-col gap-3 min-h-0">
@@ -49,7 +50,12 @@ export default function Dashboard() {
           <LossChart />
         </div>
 
-        {/* Col 3: Event timeline */}
+        {/* Col 3: A2UI agent-generated surfaces */}
+        <div className="flex flex-col min-h-0 overflow-y-auto">
+          <A2UIPanel backendUrl={BACKEND_URL} />
+        </div>
+
+        {/* Col 4: Event timeline */}
         <div className="flex flex-col rounded-xl bg-gray-900 border border-gray-700 p-3 min-h-0">
           <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-2">
             Event Stream

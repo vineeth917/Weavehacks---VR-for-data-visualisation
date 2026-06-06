@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "./components/Providers";
 
 export const metadata: Metadata = {
   title: "HoloLab — Agent Swarm Dashboard",
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full bg-gray-950 text-gray-100 font-mono">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,0 +1,141 @@
+[
+  {
+    "surfaceUpdate": {
+      "surfaceId": "eda-findings",
+      "components": [
+        {
+          "id": "root",
+          "component": { "Column": { "children": { "explicitList": ["title", "col-price", "col-income", "col-balance"] } } }
+        },
+        {
+          "id": "title",
+          "component": { "Text": { "text": { "path": "/title" }, "variant": "h4" } }
+        },
+        {
+          "id": "col-price",
+          "component": { "Row": { "children": { "explicitList": ["name-price", "flags-price"] } } }
+        },
+        {
+          "id": "name-price",
+          "component": { "Text": { "text": { "literalString": "price" } } }
+        },
+        {
+          "id": "flags-price",
+          "component": { "Text": { "text": { "literalString": "⚠ right_skewed, outliers" } } }
+        },
+        {
+          "id": "col-income",
+          "component": { "Row": { "children": { "explicitList": ["name-income", "flags-income"] } } }
+        },
+        {
+          "id": "name-income",
+          "component": { "Text": { "text": { "literalString": "income" } } }
+        },
+        {
+          "id": "flags-income",
+          "component": { "Text": { "text": { "literalString": "⚠ right_skewed" } } }
+        },
+        {
+          "id": "col-balance",
+          "component": { "Row": { "children": { "explicitList": ["name-balance", "flags-balance"] } } }
+        },
+        {
+          "id": "name-balance",
+          "component": { "Text": { "text": { "literalString": "balance" } } }
+        },
+        {
+          "id": "flags-balance",
+          "component": { "Text": { "text": { "literalString": "⚠ right_skewed" } } }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "eda-findings",
+      "path": "/",
+      "contents": [
+        { "key": "title", "valueString": "EDA Findings — housing.csv (12 columns)" }
+      ]
+    }
+  },
+  {
+    "beginRendering": {
+      "surfaceId": "eda-findings",
+      "catalogId": "https://a2ui.org/specification/v0_9/standard_catalog_definition.json",
+      "root": "root"
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "eda-action",
+      "components": [
+        {
+          "id": "root",
+          "component": { "Card": { "children": { "explicitList": ["question", "hint"] } } }
+        },
+        {
+          "id": "question",
+          "component": { "Text": { "text": { "path": "/question" }, "variant": "h5" } }
+        },
+        {
+          "id": "hint",
+          "component": { "Text": { "text": { "literalString": "price is right-skewed (skew=2.1). A log-transform is recommended." } } }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "eda-action",
+      "path": "/",
+      "contents": [
+        { "key": "question", "valueString": "Apply log-transform to price?" },
+        { "key": "column", "valueString": "price" }
+      ]
+    }
+  },
+  {
+    "beginRendering": {
+      "surfaceId": "eda-action",
+      "catalogId": "https://a2ui.org/specification/v0_9/standard_catalog_definition.json",
+      "root": "root"
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "training-verdict",
+      "components": [
+        {
+          "id": "root",
+          "component": { "Column": { "children": { "explicitList": ["verdict", "detail"] } } }
+        },
+        {
+          "id": "verdict",
+          "component": { "Text": { "text": { "path": "/verdict" }, "variant": "h4" } }
+        },
+        {
+          "id": "detail",
+          "component": { "Text": { "text": { "path": "/detail" } } }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "training-verdict",
+      "path": "/",
+      "contents": [
+        { "key": "verdict", "valueString": "⚠ Overfitting detected after step 90" },
+        { "key": "detail", "valueString": "val_loss diverges from train_loss by +0.24 at step 150. Recommend early stop at step 90." }
+      ]
+    }
+  },
+  {
+    "beginRendering": {
+      "surfaceId": "training-verdict",
+      "catalogId": "https://a2ui.org/specification/v0_9/standard_catalog_definition.json",
+      "root": "root"
+    }
+  }
+]
