@@ -119,11 +119,14 @@ async def t2_t3_select_point_triggers_surface() -> None:
             "type": "interaction", "session_id": SID,
             "action": "select_point", "point_ids": ["r12", "r37", "r91"],
         }))
-        # collect frames until 0.6s silence
-        while True:
+        # the real EDA agent now answers here — wait up to 30s for done
+        deadline = time.time() + 30.0
+        while time.time() < deadline:
             try:
-                frame = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.6))
+                frame = json.loads(await asyncio.wait_for(ws.recv(), timeout=8.0))
                 ws_frames.append(frame)
+                if frame.get("type") == "agent_status" and frame.get("state") in ("done", "error"):
+                    break
             except asyncio.TimeoutError:
                 break
 
@@ -191,9 +194,9 @@ async def t4_action_strings() -> None:
                 "type": "interaction", "session_id": SID, "action": action,
                 "context": {"column": "price", "transform": "log"},
             }))
-            # consume ws ack
+            # these actions are not agent-routed; they ack instantly
             try:
-                _ = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                _ = await asyncio.wait_for(ws.recv(), timeout=3.0)
             except asyncio.TimeoutError:
                 pass
 

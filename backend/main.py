@@ -30,6 +30,8 @@ from backend import config
 from backend.a2ui import ACTIONS as A2UI_ACTIONS
 from backend.a2ui import emitter as a2ui_emitter
 from backend.a2ui import surfaces as a2ui_surfaces
+from backend.agents import dataset_registry
+from backend.agents import eda as eda_agent
 from backend.contracts import (
     CONTRACTS_VERSION,
     AGUIEvent,
@@ -38,11 +40,14 @@ from backend.contracts import (
     Command,
     Highlight,
     Interaction,
+    Panel,
+    Panels,
     Speech,
     UserAction,
     VoiceQuery,
 )
 from backend.tools import redis_state
+from backend.tools.plots import build_panel
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,24 +144,80 @@ async def healthz() -> dict[str, Any]:
 _ClientMessage = TypeAdapter(ClientMessage)
 
 
-async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
-    """Route an interaction to the right behaviour.
+async def _build_and_send_panels(
+    ws: WebSocket,
+    df,
+    panel_specs: list,
+    *,
+    agent_name: str = "eda",
+) -> int:
+    """Render PanelSpecs to real Panel PNGs and send a `panels` frame.
 
-    Phase: interaction-loop + A2UI (pre-agent shim).
-    Real EDA-agent invocation arrives in the next phase; here we exercise the
-    full transport so B & C can integrate.
+    Returns the number of panels actually sent (some specs may fail to render).
     """
+    rendered: list[Panel] = []
+    for spec in panel_specs[:4]:  # cap at 4 per turn
+        spec_d = spec.model_dump() if hasattr(spec, "model_dump") else dict(spec)
+        column = spec_d.get("column")
+        kind = spec_d.get("kind")
+        if kind in (None,):
+            continue
+        try:
+            panel_d = await asyncio.to_thread(
+                build_panel, df, column, kind,
+                title=spec_d.get("title"),
+                flags=spec_d.get("flags") or [],
+                position_hint=spec_d.get("position_hint") or "center",
+            )
+        except Exception as e:  # noqa: BLE001
+            log.warning("panel render failed kind=%s col=%s err=%s", kind, column, e)
+            continue
+        panel_clean = {k: v for k, v in panel_d.items() if not k.startswith("_")}
+        rendered.append(Panel.model_validate(panel_clean))
+
+    if rendered:
+        await ws.send_json(Panels(panels=rendered).model_dump())
+    return len(rendered)
+
+
+def _emit_findings_surface(findings: list, sid: str, agent_name: str = "eda") -> None:
+    """Push the eda-findings A2UI surface (always, even when findings empty)."""
+    rows = []
+    for f in findings[:10]:
+        d = f.model_dump() if hasattr(f, "model_dump") else dict(f)
+        rows.append({"column": d.get("column", ""),
+                     "flag": d.get("flag", ""),
+                     "note": d.get("note", "")})
+    if not rows:
+        rows = [{"column": "—", "flag": "no flags", "note": "nothing notable"}]
+    comps, data, sfc = a2ui_surfaces.eda_findings(rows)
+    a2ui_emitter.emit_surface(sfc, comps, data, agent=agent_name)
+    # mirror to redis per §6.5
+    redis_state.append_findings(sid, rows)
+
+
+def _emit_action_surface(suggestion, sid: str, agent_name: str = "eda") -> None:
+    """Push the eda-action confirm card. Falls back to a generic suggestion."""
+    if suggestion is None:
+        column, transform = "fare", "log"
+    else:
+        d = suggestion.model_dump() if hasattr(suggestion, "model_dump") else dict(suggestion)
+        column = d.get("column") or "fare"
+        transform = d.get("transform") or "log"
+    comps, data, sfc = a2ui_surfaces.eda_action(column=column, transform=transform)
+    a2ui_emitter.emit_surface(sfc, comps, data, agent=agent_name)
+
+
+async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
     action = msg.action
     sid = msg.session_id
 
-    # ---- 1. recognised A2UI button actions (exact strings) ----
+    # ---- 1. A2UI button actions (frozen exact strings) ----
     if action in A2UI_ACTIONS:
-        # acknowledge on /ws
         await ws.send_json(
             AgentStatus(agent="router", state="done",
                         message=f"a2ui action: {action} {msg.context}").model_dump()
         )
-        # mirror back to /agui dashboard
         a2ui_emitter.emit_agui("USER_ACTION",
                                {"action": action, "context": msg.context,
                                 "target_id": msg.target_id},
@@ -165,34 +226,44 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
                                        "context": msg.context, "ts": time.time()})
         return
 
-    # ---- 2. select_point / grab_region: ask EDA to comment + highlight ----
+    # ---- 2. spatial selections → real EDA agent ----
     if action in ("select_point", "select_panel", "grab_region"):
         targets = msg.point_ids or ([msg.target_id] if msg.target_id else [])
         await ws.send_json(
             AgentStatus(agent="eda", state="thinking",
                         message=f"{action} on {len(targets)} target(s)").model_dump()
         )
-        # Speech + Highlight stub (real LLM call arrives with agents/eda.py).
-        await ws.send_json(
-            Speech(agent="eda",
-                   text=(f"You selected {len(targets)} point(s). "
-                         "I'll inspect those rows.") if action != "select_panel"
-                   else f"Inspecting panel {msg.target_id}.").model_dump()
-        )
+
+        dataset_name, df = dataset_registry.get_or_default(sid)
+        try:
+            out = await eda_agent.run_for_interaction(
+                sid=sid, action=action,
+                point_ids=msg.point_ids, target_id=msg.target_id,
+                df=df, dataset_name=dataset_name,
+            )
+        except Exception as e:  # noqa: BLE001
+            log.exception("eda interaction agent failed")
+            await ws.send_json(
+                AgentStatus(agent="eda", state="error",
+                            message=f"agent error: {e}").model_dump()
+            )
+            return
+
+        await ws.send_json(Speech(agent="eda", text=out.speech).model_dump())
         await ws.send_json(
             Highlight(target_ids=targets,
-                      reason=f"{action} ack").model_dump()
+                      reason=action).model_dump()
         )
-        # Trigger the eda-action surface so the dashboard renders a confirm card
-        # (real agent will choose the column from the selection; we pick the
-        # first target's column suffix as a placeholder).
-        column = (targets[0].split("_", 1)[0] if targets else "price")
-        comps, data, sfc = a2ui_surfaces.eda_action(column=column, transform="log")
-        a2ui_emitter.emit_surface(sfc, comps, data, agent="eda")
+        # render any panels the agent asked for
+        await _build_and_send_panels(ws, df, out.panel_specs, agent_name="eda")
+        # always emit eda-action so the dashboard shows a card; use the agent's
+        # transform_suggestion when present, else fall back to a default.
+        _emit_action_surface(out.transform_suggestion, sid)
+        # mirror findings if any
+        if out.findings:
+            _emit_findings_surface(out.findings, sid)
 
-        await ws.send_json(
-            AgentStatus(agent="eda", state="done").model_dump()
-        )
+        await ws.send_json(AgentStatus(agent="eda", state="done").model_dump())
         return
 
     # ---- 3. unknown action ----
@@ -202,30 +273,73 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
     )
 
 
-async def _handle_message(ws: WebSocket, msg: ClientMessage) -> None:
-    if isinstance(msg, VoiceQuery):
-        await ws.send_json(
-            AgentStatus(agent="router", state="thinking",
-                        message=f"received voice_query: {msg.text!r}").model_dump()
-        )
-        await ws.send_json(
-            Speech(agent="router",
-                   text=f"(echo) You said: {msg.text}").model_dump()
-        )
-        await ws.send_json(
-            AgentStatus(agent="router", state="done").model_dump()
-        )
-        redis_state.push_memory(msg.session_id,
-                                {"role": "user", "text": msg.text, "ts": time.time()})
+async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
+    sid = msg.session_id
+    await ws.send_json(
+        AgentStatus(agent="eda", state="thinking",
+                    message=f"received: {msg.text!r}").model_dump()
+    )
+    redis_state.push_memory(sid, {"role": "user", "text": msg.text, "ts": time.time()})
 
-    elif isinstance(msg, Command):
+    dataset_name, df = dataset_registry.get_or_default(sid)
+    try:
+        out = await eda_agent.run_for_query(
+            sid=sid, text=msg.text, df=df, dataset_name=dataset_name,
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("eda voice_query agent failed")
+        await ws.send_json(
+            AgentStatus(agent="eda", state="error",
+                        message=f"agent error: {e}").model_dump()
+        )
+        return
+
+    await ws.send_json(Speech(agent="eda", text=out.speech).model_dump())
+    n_panels = await _build_and_send_panels(ws, df, out.panel_specs, agent_name="eda")
+    _emit_findings_surface(out.findings, sid)
+    log.info("voice_query sid=%s panels=%d findings=%d ds=%s",
+             sid, n_panels, len(out.findings), dataset_name)
+    await ws.send_json(
+        AgentStatus(agent="eda", state="done",
+                    message=f"panels={n_panels} findings={len(out.findings)} ds={dataset_name}").model_dump()
+    )
+
+
+async def _handle_command(ws: WebSocket, msg: Command) -> None:
+    sid = msg.session_id
+    if msg.action == "load_dataset":
+        name = (msg.params or {}).get("name", dataset_registry.DEFAULT)
+        try:
+            df = await asyncio.to_thread(dataset_registry.load, sid, name)
+        except Exception as e:  # noqa: BLE001
+            await ws.send_json(
+                AgentStatus(agent="router", state="error",
+                            message=f"load_dataset {name}: {e}").model_dump()
+            )
+            return
         await ws.send_json(
             AgentStatus(agent="router", state="done",
-                        message=f"command acknowledged: {msg.action}").model_dump()
+                        message=f"dataset loaded: {name} shape={df.shape}").model_dump()
         )
-        if msg.action == "reset":
-            n = redis_state.reset_session(msg.session_id)
-            log.info("reset session=%s purged_keys=%d", msg.session_id, n)
+        return
+
+    if msg.action == "reset":
+        n = redis_state.reset_session(sid)
+        dataset_registry.reset(sid)
+        log.info("reset session=%s purged_keys=%d", sid, n)
+
+    await ws.send_json(
+        AgentStatus(agent="router", state="done",
+                    message=f"command acknowledged: {msg.action}").model_dump()
+    )
+
+
+async def _handle_message(ws: WebSocket, msg: ClientMessage) -> None:
+    if isinstance(msg, VoiceQuery):
+        await _handle_voice_query(ws, msg)
+
+    elif isinstance(msg, Command):
+        await _handle_command(ws, msg)
 
     elif isinstance(msg, Interaction):
         await _handle_interaction(ws, msg)

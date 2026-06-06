@@ -26,3 +26,4 @@ dist/
 # data artifacts
 wandb/
 *.log
+data/.seaborn_cache/
