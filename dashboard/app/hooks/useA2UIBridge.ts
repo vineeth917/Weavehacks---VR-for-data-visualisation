@@ -52,11 +52,18 @@ export function useA2UIBridge(backendUrl: string) {
     es.onmessage = (e) => {
       try {
         const raw = JSON.parse(e.data);
-        // AG-UI CUSTOM event carries envelope in args
-        if (raw.event === "CUSTOM" && raw.args?.envelope) {
-          processMessages([raw.args.envelope as Record<string, unknown>]);
+        // Backend wire format (backend/a2ui/emitter.py):
+        //   { type:"CUSTOM", name:"surfaceUpdate"|"dataModelUpdate"|"beginRendering", value:{...}, ts:... }
+        if ((raw.type === "CUSTOM" || raw.event === "CUSTOM") && raw.name && raw.value) {
+          processMessages([{ [raw.name]: raw.value }]);
+          return;
         }
-        // Also accept bare envelope (backend may send directly)
+        // Fallback: args.envelope shape (older draft)
+        if (raw.args?.envelope) {
+          processMessages([raw.args.envelope as Record<string, unknown>]);
+          return;
+        }
+        // Fallback: bare envelope
         if (raw.surfaceUpdate || raw.dataModelUpdate || raw.beginRendering) {
           processMessages([raw]);
         }
