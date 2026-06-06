@@ -42,12 +42,15 @@
     import { onMessage } from './src/ws.js';
     import { renderPanels, highlightPanel } from './src/panels.js';
     import { renderScatter, clearScatter } from './src/scatter3d.js';
+    import { initRibbon, addTrainingStep, clearRibbon } from './src/loss_ribbon.js';
 
     initScene();
 
     onMessage('panels', (msg) => renderPanels(msg));
     onMessage('highlight', (msg) => highlightPanel(msg.target_ids));
     onMessage('scatter3d', (msg) => renderScatter(msg));
+    initRibbon();
+    onMessage('training_update', (msg) => addTrainingStep(msg));
   </script>
 </body>
 </html>
