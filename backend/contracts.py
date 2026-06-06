@@ -38,7 +38,7 @@ class VoiceQuery(BaseModel):
 class Command(BaseModel):
     type: Literal["command"] = "command"
     session_id: str
-    action: Literal["load_dataset", "train_baseline", "run_evals", "reset"]
+    action: Literal["load_dataset", "load_run", "train_baseline", "run_evals", "reset"]
     params: dict[str, Any] = Field(default_factory=dict)
 
 

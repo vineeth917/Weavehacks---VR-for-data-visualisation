@@ -18,8 +18,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
-from dataclasses import dataclass
 from typing import Any, Literal
 
 import pandas as pd
@@ -31,6 +29,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from backend import config
 from backend.a2ui import surfaces as a2ui_surfaces
+from backend.agents.context import OrchestratorContext
+from backend.agents.parse import parse_json_object
 from backend.tools import redis_state
 from backend.tools.profiling import flag_columns as _flag_columns_impl
 from backend.tools.profiling import profile_dataset as _profile_dataset_impl
@@ -38,15 +38,8 @@ from backend.tools.profiling import profile_dataset as _profile_dataset_impl
 log = logging.getLogger("hololab.agents.eda")
 
 
-# ---------------------------------------------------------------------------
-# Context that flows through the agent run
-# ---------------------------------------------------------------------------
-
-@dataclass
-class EDAContext:
-    session_id: str
-    dataset_name: str
-    df: pd.DataFrame
+# Back-compat alias — old code imported EDAContext from this module.
+EDAContext = OrchestratorContext
 
 
 # ---------------------------------------------------------------------------
@@ -236,11 +229,24 @@ Output (EDAOutput, JSON):
                       Prefer kde for high-cardinality numerics, histogram
                       for low-cardinality. Include `flags` if the column
                       has any (copy from the profile).
-  - findings          rows for the eda-findings A2UI surface; one row per
+     - findings          rows for the eda-findings A2UI surface; one row per
                       flagged column you want highlighted. Each row has
                       column + flag + short note (<=12 words). Aim for 3-5
                       rows when there are interesting flags, 0 when the
                       dataset is clean.
+
+                      WHEN A COLUMN HAS MULTIPLE FLAGS, choose the MOST
+                      ACTIONABLE one for the `flag` field, using this
+                      strict priority (left wins):
+                          heavy_missing > near_constant > outliers
+                                        > right_skewed / left_skewed
+                                        > high_cardinality
+                      The note can mention secondary flags briefly. E.g.
+                      a column flagged [near_constant, right_skewed, high_cardinality]
+                      → flag: "near_constant",
+                        note: "~98% one value, low-information feature".
+                      A column flagged [right_skewed, outliers] → flag:
+                      "outliers", note: "heavy right tail, log candidate".
   - transform_suggestion  optional. Set ONLY when the user is targeting a
                           specific column AND a transform clearly helps
                           (e.g. log on right_skewed `fare`). Omit otherwise.
@@ -342,32 +348,29 @@ async def run_for_interaction(
     return await _run_with_fallback(" ".join(parts), ctx)
 
 
-_JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
-
-
 def _parse_eda_output(raw: str) -> EDAOutput:
     """Tolerantly extract the EDAOutput JSON from the agent's final text."""
-    text = (raw or "").strip()
-    candidates: list[str] = []
-    m = _JSON_FENCE_RE.search(text)
-    if m:
-        candidates.append(m.group(1))
-    # also try the whole text and a brace-trimmed slice
-    candidates.append(text)
-    if "{" in text and "}" in text:
-        candidates.append(text[text.find("{"): text.rfind("}") + 1])
-    for c in candidates:
-        try:
-            data = json.loads(c)
-        except Exception:  # noqa: BLE001
-            continue
+    data = parse_json_object(raw or "")
+    if data is not None:
         try:
             return EDAOutput.model_validate(data)
-        except ValidationError:
-            continue
-    # last-ditch: build a speech-only result from the raw text
+        except ValidationError as e:
+            log.warning("EDA output validation failed: %s — degrading", e)
+            # try to salvage at least speech + best-effort findings
+            return EDAOutput(
+                speech=str(data.get("speech") or (raw or ""))[:300],
+                panel_specs=[
+                    PanelSpec.model_validate(p) for p in (data.get("panel_specs") or [])
+                    if isinstance(p, dict) and "kind" in p
+                ][:4],
+                findings=[
+                    FindingRow.model_validate(f) for f in (data.get("findings") or [])
+                    if isinstance(f, dict) and "column" in f and "flag" in f
+                ][:8],
+                transform_suggestion=None,
+            )
     return EDAOutput(
-        speech=(text or "I could not produce a structured response.")[:300],
+        speech=(raw or "I could not produce a structured response.")[:300],
         panel_specs=[], findings=[], transform_suggestion=None,
     )
 

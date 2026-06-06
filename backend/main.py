@@ -32,6 +32,9 @@ from backend.a2ui import emitter as a2ui_emitter
 from backend.a2ui import surfaces as a2ui_surfaces
 from backend.agents import dataset_registry
 from backend.agents import eda as eda_agent
+from backend.agents import router as router_agent
+from backend.agents import run_registry
+from backend.agents.context import OrchestratorContext
 from backend.contracts import (
     CONTRACTS_VERSION,
     AGUIEvent,
@@ -43,6 +46,7 @@ from backend.contracts import (
     Panel,
     Panels,
     Speech,
+    TrainingUpdate,
     UserAction,
     VoiceQuery,
 )
@@ -273,35 +277,87 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
     )
 
 
+def _emit_training_verdict_surface(out, sid: str) -> None:
+    """Build + emit the training-verdict A2UI surface from a TrainingMonitorOutput."""
+    reason = " ".join(out.rationale[:3]) if out.rationale else out.speech
+    # truncate reason for the card
+    reason = reason[:240]
+    comps, data, sfc = a2ui_surfaces.training_verdict(
+        run_id=out.run_id or "unknown",
+        verdict=out.verdict,
+        reason=reason,
+        step=int(out.step or 0),
+    )
+    a2ui_emitter.emit_surface(sfc, comps, data, agent="training_monitor")
+
+
 async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
     sid = msg.session_id
     await ws.send_json(
-        AgentStatus(agent="eda", state="thinking",
+        AgentStatus(agent="router", state="thinking",
                     message=f"received: {msg.text!r}").model_dump()
     )
     redis_state.push_memory(sid, {"role": "user", "text": msg.text, "ts": time.time()})
 
     dataset_name, df = dataset_registry.get_or_default(sid)
+    active_run = run_registry.get_active(sid)
+    ctx = OrchestratorContext(
+        session_id=sid,
+        dataset_name=dataset_name,
+        df=df,
+        active_run_id=active_run,
+    )
+
     try:
-        out = await eda_agent.run_for_query(
-            sid=sid, text=msg.text, df=df, dataset_name=dataset_name,
-        )
+        result = await router_agent.route(sid=sid, text=msg.text, ctx=ctx)
     except Exception as e:  # noqa: BLE001
-        log.exception("eda voice_query agent failed")
+        log.exception("router failed")
         await ws.send_json(
-            AgentStatus(agent="eda", state="error",
-                        message=f"agent error: {e}").model_dump()
+            AgentStatus(agent="router", state="error",
+                        message=f"router error: {e}").model_dump()
         )
         return
 
-    await ws.send_json(Speech(agent="eda", text=out.speech).model_dump())
-    n_panels = await _build_and_send_panels(ws, df, out.panel_specs, agent_name="eda")
-    _emit_findings_surface(out.findings, sid)
-    log.info("voice_query sid=%s panels=%d findings=%d ds=%s",
-             sid, n_panels, len(out.findings), dataset_name)
+    # ---- specialist: EDA ----
+    if result.target == "eda" and result.eda is not None:
+        out = result.eda
+        await ws.send_json(Speech(agent="eda", text=out.speech).model_dump())
+        n_panels = await _build_and_send_panels(ws, df, out.panel_specs, agent_name="eda")
+        _emit_findings_surface(out.findings, sid)
+        log.info("voice_query sid=%s -> eda  panels=%d findings=%d ds=%s",
+                 sid, n_panels, len(out.findings), dataset_name)
+        await ws.send_json(
+            AgentStatus(agent="eda", state="done",
+                        message=f"panels={n_panels} findings={len(out.findings)} ds={dataset_name}").model_dump()
+        )
+        return
+
+    # ---- specialist: training_monitor ----
+    if result.target == "training_monitor" and result.training is not None:
+        out = result.training
+        await ws.send_json(Speech(agent="training_monitor", text=out.speech).model_dump())
+        # one training_update frame for the VR client (PLAN §6.2)
+        await ws.send_json(TrainingUpdate(
+            run_id=out.run_id or active_run,
+            step=int(out.step or 0),
+            metrics={"verdict_code": {"healthy": 0, "overfitting": 1,
+                                       "underfitting": 2, "leakage": 3,
+                                       "unknown": -1}.get(out.verdict, -1)},
+            status="running",
+        ).model_dump())
+        _emit_training_verdict_surface(out, sid)
+        log.info("voice_query sid=%s -> training_monitor verdict=%s run=%s step=%d",
+                 sid, out.verdict, out.run_id, out.step)
+        await ws.send_json(
+            AgentStatus(agent="training_monitor", state="done",
+                        message=f"verdict={out.verdict} action={out.suggested_action} run={out.run_id}").model_dump()
+        )
+        return
+
+    # ---- nothing usable ----
     await ws.send_json(
-        AgentStatus(agent="eda", state="done",
-                    message=f"panels={n_panels} findings={len(out.findings)} ds={dataset_name}").model_dump()
+        AgentStatus(agent="router", state="error",
+                    message=f"router produced no usable output (target={result.target})").model_dump()
     )
 
 
@@ -323,9 +379,19 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
         )
         return
 
+    if msg.action == "load_run":
+        run_id = (msg.params or {}).get("run_id", run_registry.DEFAULT_RUN)
+        run_registry.set_active(sid, run_id)
+        await ws.send_json(
+            AgentStatus(agent="router", state="done",
+                        message=f"active run set: {run_id}").model_dump()
+        )
+        return
+
     if msg.action == "reset":
         n = redis_state.reset_session(sid)
         dataset_registry.reset(sid)
+        run_registry.reset(sid)
         log.info("reset session=%s purged_keys=%d", sid, n)
 
     await ws.send_json(
