@@ -1,0 +1,28 @@
+.rocketride/
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node / dashboard
+node_modules/
+.next/
+dist/
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# data artifacts
+wandb/
+*.log
