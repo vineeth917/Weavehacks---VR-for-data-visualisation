@@ -41,11 +41,13 @@
     import { initScene } from './src/scene.js';
     import { onMessage } from './src/ws.js';
     import { renderPanels, highlightPanel } from './src/panels.js';
+    import { renderScatter, clearScatter } from './src/scatter3d.js';
 
     initScene();
 
     onMessage('panels', (msg) => renderPanels(msg));
     onMessage('highlight', (msg) => highlightPanel(msg.target_ids));
+    onMessage('scatter3d', (msg) => renderScatter(msg));
   </script>
 </body>
 </html>
