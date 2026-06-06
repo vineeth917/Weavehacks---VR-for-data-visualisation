@@ -1,0 +1,9 @@
+{
+  "type": "panels",
+  "panels": [
+    {"id":"price_hist","kind":"histogram","title":"Price Distribution","column":"price","image_b64":"","position_hint":"left","flags":["right_skewed","outliers"]},
+    {"id":"income_box","kind":"box","title":"Income Box Plot","column":"income","image_b64":"","position_hint":"center-left","flags":["right_skewed","outliers"]},
+    {"id":"balance_kde","kind":"kde","title":"Balance Density","column":"balance","image_b64":"","position_hint":"center-right","flags":[]},
+    {"id":"missing_matrix","kind":"missing","title":"Missing Values","column":"all","image_b64":"","position_hint":"right","flags":[]}
+  ]
+}

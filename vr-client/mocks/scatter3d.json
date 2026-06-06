@@ -1,0 +1,511 @@
+{
+  "type": "scatter3d",
+  "title": "Embedding Projection",
+  "axes": {
+    "x": "PC1",
+    "y": "PC2",
+    "z": "PC3"
+  },
+  "points": [
+    {
+      "id": "r0",
+      "x": 0.28,
+      "y": -0.95,
+      "z": -0.45,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 0"
+    },
+    {
+      "id": "r1",
+      "x": -0.55,
+      "y": 0.47,
+      "z": 0.35,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 1"
+    },
+    {
+      "id": "r2",
+      "x": 0.78,
+      "y": -0.83,
+      "z": -0.16,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 2"
+    },
+    {
+      "id": "r3",
+      "x": -0.94,
+      "y": -0.56,
+      "z": 0.01,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 3"
+    },
+    {
+      "id": "r4",
+      "x": -0.95,
+      "y": -0.6,
+      "z": 0.3,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 4"
+    },
+    {
+      "id": "r5",
+      "x": 0.09,
+      "y": -0.56,
+      "z": 0.18,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 5"
+    },
+    {
+      "id": "r6",
+      "x": 0.62,
+      "y": -0.99,
+      "z": 0.61,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 6"
+    },
+    {
+      "id": "r7",
+      "x": 0.4,
+      "y": -0.32,
+      "z": -0.69,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 7"
+    },
+    {
+      "id": "r8",
+      "x": 0.91,
+      "y": -0.33,
+      "z": -0.81,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 8"
+    },
+    {
+      "id": "r9",
+      "x": -0.81,
+      "y": 0.69,
+      "z": 0.21,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 9"
+    },
+    {
+      "id": "r10",
+      "x": 0.61,
+      "y": 0.46,
+      "z": 0.07,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 10"
+    },
+    {
+      "id": "r11",
+      "x": 0.95,
+      "y": -0.24,
+      "z": 0.1,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 11"
+    },
+    {
+      "id": "r12",
+      "x": 0.66,
+      "y": 0.24,
+      "z": 0.72,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 12"
+    },
+    {
+      "id": "r13",
+      "x": 0.15,
+      "y": 0.41,
+      "z": -0.91,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 13"
+    },
+    {
+      "id": "r14",
+      "x": -0.54,
+      "y": -0.42,
+      "z": -0.84,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 14"
+    },
+    {
+      "id": "r15",
+      "x": -0.53,
+      "y": -0.8,
+      "z": -0.44,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 15"
+    },
+    {
+      "id": "r16",
+      "x": 0.27,
+      "y": -0.27,
+      "z": -0.26,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 16"
+    },
+    {
+      "id": "r17",
+      "x": -0.58,
+      "y": -0.47,
+      "z": 0.87,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 17"
+    },
+    {
+      "id": "r18",
+      "x": 0.3,
+      "y": 0.22,
+      "z": -0.66,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 18"
+    },
+    {
+      "id": "r19",
+      "x": 0.46,
+      "y": -0.67,
+      "z": -0.24,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 19"
+    },
+    {
+      "id": "r20",
+      "x": 0.98,
+      "y": 0.28,
+      "z": 0.11,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 20"
+    },
+    {
+      "id": "r21",
+      "x": 0.37,
+      "y": 0.69,
+      "z": 0.55,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 21"
+    },
+    {
+      "id": "r22",
+      "x": -0.54,
+      "y": -0.94,
+      "z": -0.37,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 22"
+    },
+    {
+      "id": "r23",
+      "x": -0.46,
+      "y": -0.58,
+      "z": 0.89,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 23"
+    },
+    {
+      "id": "r24",
+      "x": 0.75,
+      "y": -0.37,
+      "z": 0.31,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 24"
+    },
+    {
+      "id": "r25",
+      "x": -0.21,
+      "y": 0.83,
+      "z": -0.08,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 25"
+    },
+    {
+      "id": "r26",
+      "x": -0.47,
+      "y": -0.51,
+      "z": 0.12,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 26"
+    },
+    {
+      "id": "r27",
+      "x": -0.47,
+      "y": 0.17,
+      "z": 0.8,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 27"
+    },
+    {
+      "id": "r28",
+      "x": -0.2,
+      "y": -0.56,
+      "z": 1.0,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 28"
+    },
+    {
+      "id": "r29",
+      "x": 0.02,
+      "y": -0.82,
+      "z": -0.91,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 29"
+    },
+    {
+      "id": "r30",
+      "x": -0.78,
+      "y": 0.25,
+      "z": 0.58,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 30"
+    },
+    {
+      "id": "r31",
+      "x": -0.16,
+      "y": -0.87,
+      "z": -0.24,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 31"
+    },
+    {
+      "id": "r32",
+      "x": 0.99,
+      "y": 0.06,
+      "z": 0.94,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 32"
+    },
+    {
+      "id": "r33",
+      "x": 0.72,
+      "y": -0.98,
+      "z": 0.44,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 33"
+    },
+    {
+      "id": "r34",
+      "x": 0.36,
+      "y": 0.07,
+      "z": -0.47,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 34"
+    },
+    {
+      "id": "r35",
+      "x": 0.28,
+      "y": -0.78,
+      "z": -0.13,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 35"
+    },
+    {
+      "id": "r36",
+      "x": -0.09,
+      "y": 0.91,
+      "z": 0.75,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 36"
+    },
+    {
+      "id": "r37",
+      "x": -0.47,
+      "y": 0.0,
+      "z": -0.64,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 37"
+    },
+    {
+      "id": "r38",
+      "x": 0.83,
+      "y": 0.74,
+      "z": -0.4,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 38"
+    },
+    {
+      "id": "r39",
+      "x": 0.28,
+      "y": 0.22,
+      "z": -0.69,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 39"
+    },
+    {
+      "id": "r40",
+      "x": 0.53,
+      "y": 0.08,
+      "z": 0.56,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 40"
+    },
+    {
+      "id": "r41",
+      "x": 0.06,
+      "y": -1.0,
+      "z": -0.35,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 41"
+    },
+    {
+      "id": "r42",
+      "x": -0.96,
+      "y": 0.86,
+      "z": 0.76,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 42"
+    },
+    {
+      "id": "r43",
+      "x": 0.66,
+      "y": -0.38,
+      "z": -0.88,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 43"
+    },
+    {
+      "id": "r44",
+      "x": 0.76,
+      "y": 0.89,
+      "z": -0.83,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 44"
+    },
+    {
+      "id": "r45",
+      "x": -0.03,
+      "y": -0.86,
+      "z": 0.52,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 45"
+    },
+    {
+      "id": "r46",
+      "x": 0.53,
+      "y": -0.74,
+      "z": -0.05,
+      "color": "#3498db",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 46"
+    },
+    {
+      "id": "r47",
+      "x": 0.1,
+      "y": -0.47,
+      "z": 0.74,
+      "color": "#f39c12",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 47"
+    },
+    {
+      "id": "r48",
+      "x": -0.15,
+      "y": -0.58,
+      "z": 0.08,
+      "color": "#3cb371",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 48"
+    },
+    {
+      "id": "r49",
+      "x": 0.46,
+      "y": -0.6,
+      "z": -0.38,
+      "color": "#e74c3c",
+      "size": 0.04,
+      "shape": "sphere",
+      "label": "row 49"
+    }
+  ]
+}

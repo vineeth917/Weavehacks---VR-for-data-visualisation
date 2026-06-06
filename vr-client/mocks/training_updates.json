@@ -1,0 +1,1002 @@
+[
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 0,
+    "metrics": {
+      "train_loss": 1.0,
+      "val_loss": 1.0
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 1,
+    "metrics": {
+      "train_loss": 0.9695,
+      "val_loss": 0.9772
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 2,
+    "metrics": {
+      "train_loss": 0.9359,
+      "val_loss": 0.9477
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 3,
+    "metrics": {
+      "train_loss": 0.9119,
+      "val_loss": 0.9346
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 4,
+    "metrics": {
+      "train_loss": 0.8836,
+      "val_loss": 0.9046
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 5,
+    "metrics": {
+      "train_loss": 0.8554,
+      "val_loss": 0.8939
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 6,
+    "metrics": {
+      "train_loss": 0.8332,
+      "val_loss": 0.8807
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 7,
+    "metrics": {
+      "train_loss": 0.8195,
+      "val_loss": 0.8415
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 8,
+    "metrics": {
+      "train_loss": 0.7864,
+      "val_loss": 0.8372
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 9,
+    "metrics": {
+      "train_loss": 0.7637,
+      "val_loss": 0.8063
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 10,
+    "metrics": {
+      "train_loss": 0.7539,
+      "val_loss": 0.7993
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 11,
+    "metrics": {
+      "train_loss": 0.7257,
+      "val_loss": 0.7874
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 12,
+    "metrics": {
+      "train_loss": 0.711,
+      "val_loss": 0.7568
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 13,
+    "metrics": {
+      "train_loss": 0.6804,
+      "val_loss": 0.7465
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 14,
+    "metrics": {
+      "train_loss": 0.667,
+      "val_loss": 0.732
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 15,
+    "metrics": {
+      "train_loss": 0.6539,
+      "val_loss": 0.7221
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 16,
+    "metrics": {
+      "train_loss": 0.6405,
+      "val_loss": 0.6938
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 17,
+    "metrics": {
+      "train_loss": 0.6144,
+      "val_loss": 0.6854
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 18,
+    "metrics": {
+      "train_loss": 0.6056,
+      "val_loss": 0.6697
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 19,
+    "metrics": {
+      "train_loss": 0.5792,
+      "val_loss": 0.6613
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 20,
+    "metrics": {
+      "train_loss": 0.5679,
+      "val_loss": 0.6445
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 21,
+    "metrics": {
+      "train_loss": 0.5506,
+      "val_loss": 0.6476
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 22,
+    "metrics": {
+      "train_loss": 0.5396,
+      "val_loss": 0.6341
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 23,
+    "metrics": {
+      "train_loss": 0.5277,
+      "val_loss": 0.603
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 24,
+    "metrics": {
+      "train_loss": 0.5219,
+      "val_loss": 0.6106
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 25,
+    "metrics": {
+      "train_loss": 0.5087,
+      "val_loss": 0.6018
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 26,
+    "metrics": {
+      "train_loss": 0.4946,
+      "val_loss": 0.573
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 27,
+    "metrics": {
+      "train_loss": 0.477,
+      "val_loss": 0.5638
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 28,
+    "metrics": {
+      "train_loss": 0.4643,
+      "val_loss": 0.5502
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 29,
+    "metrics": {
+      "train_loss": 0.453,
+      "val_loss": 0.5628
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 30,
+    "metrics": {
+      "train_loss": 0.4405,
+      "val_loss": 0.5487
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 31,
+    "metrics": {
+      "train_loss": 0.4334,
+      "val_loss": 0.531
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 32,
+    "metrics": {
+      "train_loss": 0.4315,
+      "val_loss": 0.536
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 33,
+    "metrics": {
+      "train_loss": 0.4156,
+      "val_loss": 0.5208
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 34,
+    "metrics": {
+      "train_loss": 0.4,
+      "val_loss": 0.5024
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 35,
+    "metrics": {
+      "train_loss": 0.4041,
+      "val_loss": 0.5013
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 36,
+    "metrics": {
+      "train_loss": 0.3888,
+      "val_loss": 0.4976
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 37,
+    "metrics": {
+      "train_loss": 0.3727,
+      "val_loss": 0.4862
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 38,
+    "metrics": {
+      "train_loss": 0.3718,
+      "val_loss": 0.4854
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 39,
+    "metrics": {
+      "train_loss": 0.3586,
+      "val_loss": 0.481
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 40,
+    "metrics": {
+      "train_loss": 0.35,
+      "val_loss": 0.4556
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 41,
+    "metrics": {
+      "train_loss": 0.351,
+      "val_loss": 0.4607
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 42,
+    "metrics": {
+      "train_loss": 0.3384,
+      "val_loss": 0.441
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 43,
+    "metrics": {
+      "train_loss": 0.3421,
+      "val_loss": 0.4378
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 44,
+    "metrics": {
+      "train_loss": 0.3309,
+      "val_loss": 0.4408
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 45,
+    "metrics": {
+      "train_loss": 0.3219,
+      "val_loss": 0.4341
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 46,
+    "metrics": {
+      "train_loss": 0.3176,
+      "val_loss": 0.4368
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 47,
+    "metrics": {
+      "train_loss": 0.3067,
+      "val_loss": 0.4262
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 48,
+    "metrics": {
+      "train_loss": 0.3016,
+      "val_loss": 0.4132
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 49,
+    "metrics": {
+      "train_loss": 0.303,
+      "val_loss": 0.4057
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 50,
+    "metrics": {
+      "train_loss": 0.2922,
+      "val_loss": 0.4116
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 51,
+    "metrics": {
+      "train_loss": 0.2833,
+      "val_loss": 0.3997
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 52,
+    "metrics": {
+      "train_loss": 0.2932,
+      "val_loss": 0.408
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 53,
+    "metrics": {
+      "train_loss": 0.2737,
+      "val_loss": 0.3847
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 54,
+    "metrics": {
+      "train_loss": 0.2722,
+      "val_loss": 0.3976
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 55,
+    "metrics": {
+      "train_loss": 0.2777,
+      "val_loss": 0.392
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 56,
+    "metrics": {
+      "train_loss": 0.2653,
+      "val_loss": 0.3706
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 57,
+    "metrics": {
+      "train_loss": 0.2686,
+      "val_loss": 0.3797
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 58,
+    "metrics": {
+      "train_loss": 0.2612,
+      "val_loss": 0.3826
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 59,
+    "metrics": {
+      "train_loss": 0.2581,
+      "val_loss": 0.3554
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 60,
+    "metrics": {
+      "train_loss": 0.257,
+      "val_loss": 0.3588
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 61,
+    "metrics": {
+      "train_loss": 0.251,
+      "val_loss": 0.3706
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 62,
+    "metrics": {
+      "train_loss": 0.239,
+      "val_loss": 0.3474
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 63,
+    "metrics": {
+      "train_loss": 0.2353,
+      "val_loss": 0.3546
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 64,
+    "metrics": {
+      "train_loss": 0.2349,
+      "val_loss": 0.3526
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 65,
+    "metrics": {
+      "train_loss": 0.2389,
+      "val_loss": 0.3399
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 66,
+    "metrics": {
+      "train_loss": 0.2345,
+      "val_loss": 0.3383
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 67,
+    "metrics": {
+      "train_loss": 0.2294,
+      "val_loss": 0.3508
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 68,
+    "metrics": {
+      "train_loss": 0.2323,
+      "val_loss": 0.3285
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 69,
+    "metrics": {
+      "train_loss": 0.2229,
+      "val_loss": 0.3302
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 70,
+    "metrics": {
+      "train_loss": 0.2137,
+      "val_loss": 0.3394
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 71,
+    "metrics": {
+      "train_loss": 0.2213,
+      "val_loss": 0.3246
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 72,
+    "metrics": {
+      "train_loss": 0.2206,
+      "val_loss": 0.3291
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 73,
+    "metrics": {
+      "train_loss": 0.2132,
+      "val_loss": 0.3136
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 74,
+    "metrics": {
+      "train_loss": 0.2053,
+      "val_loss": 0.3323
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 75,
+    "metrics": {
+      "train_loss": 0.2165,
+      "val_loss": 0.3219
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 76,
+    "metrics": {
+      "train_loss": 0.2133,
+      "val_loss": 0.3207
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 77,
+    "metrics": {
+      "train_loss": 0.2003,
+      "val_loss": 0.3076
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 78,
+    "metrics": {
+      "train_loss": 0.2008,
+      "val_loss": 0.3241
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 79,
+    "metrics": {
+      "train_loss": 0.2068,
+      "val_loss": 0.3212
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 80,
+    "metrics": {
+      "train_loss": 0.2066,
+      "val_loss": 0.3035
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 81,
+    "metrics": {
+      "train_loss": 0.1945,
+      "val_loss": 0.2992
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 82,
+    "metrics": {
+      "train_loss": 0.2013,
+      "val_loss": 0.316
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 83,
+    "metrics": {
+      "train_loss": 0.1937,
+      "val_loss": 0.308
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 84,
+    "metrics": {
+      "train_loss": 0.1881,
+      "val_loss": 0.3137
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 85,
+    "metrics": {
+      "train_loss": 0.1979,
+      "val_loss": 0.3131
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 86,
+    "metrics": {
+      "train_loss": 0.1956,
+      "val_loss": 0.3093
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 87,
+    "metrics": {
+      "train_loss": 0.1816,
+      "val_loss": 0.3043
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 88,
+    "metrics": {
+      "train_loss": 0.1852,
+      "val_loss": 0.3074
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 89,
+    "metrics": {
+      "train_loss": 0.1914,
+      "val_loss": 0.25
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 90,
+    "metrics": {
+      "train_loss": 0.1903,
+      "val_loss": 0.2453
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 91,
+    "metrics": {
+      "train_loss": 0.1887,
+      "val_loss": 0.2644
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 92,
+    "metrics": {
+      "train_loss": 0.1889,
+      "val_loss": 0.3016
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 93,
+    "metrics": {
+      "train_loss": 0.1773,
+      "val_loss": 0.323
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 94,
+    "metrics": {
+      "train_loss": 0.18,
+      "val_loss": 0.335
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 95,
+    "metrics": {
+      "train_loss": 0.1843,
+      "val_loss": 0.3557
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 96,
+    "metrics": {
+      "train_loss": 0.1709,
+      "val_loss": 0.3772
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 97,
+    "metrics": {
+      "train_loss": 0.1748,
+      "val_loss": 0.4129
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 98,
+    "metrics": {
+      "train_loss": 0.1841,
+      "val_loss": 0.4234
+    },
+    "status": "running"
+  },
+  {
+    "type": "training_update",
+    "run_id": "replay_run_1",
+    "step": 99,
+    "metrics": {
+      "train_loss": 0.15,
+      "val_loss": 0.45
+    },
+    "status": "done"
+  }
+]
