@@ -1,5 +1,6 @@
 [
-  { "type": "RUN_STARTED", "agent": "router", "ts": 0, "message": "Received query: which columns are skewed?" },
+  { "type": "voice_query", "agent": "system", "ts": 0, "text": "which columns are skewed?" },
+  { "type": "RUN_STARTED", "agent": "router", "ts": 100, "message": "Received query: which columns are skewed?" },
   { "type": "TEXT_MESSAGE_CONTENT", "agent": "router", "ts": 200, "message": "Routing to EDA agent..." },
   { "type": "HANDOFF", "agent": "router", "to": "eda", "ts": 400, "message": "Handing off to EDA agent" },
   { "type": "TOOL_CALL_START", "agent": "eda", "tool": "profile_dataset", "args": { "path": "data/housing.csv" }, "ts": 600 },

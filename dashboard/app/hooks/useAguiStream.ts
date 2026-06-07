@@ -125,7 +125,7 @@ export function useAguiStream(backendUrl: string) {
           args: isCustom ? value : raw.args as Record<string, unknown> | undefined,
           result: raw.result != null ? String(raw.result) : undefined,
           message: (raw.message ?? value.message ?? raw.args?.message) as string | undefined,
-          text: (value.text ?? value.speech) as string | undefined,
+          text: (value.text ?? value.speech ?? raw.text) as string | undefined,
           state: value.state as string | undefined,
           sections: value.sections as { heading?: string; body?: string }[] | undefined,
           ts: raw.ts > 1_000_000_000 ? Math.round(raw.ts * 1000) : raw.ts,

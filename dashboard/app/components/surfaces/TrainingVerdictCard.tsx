@@ -2,7 +2,7 @@
 
 import { A2UIRenderer, useA2UI } from "@copilotkit/a2ui-renderer";
 
-export function TrainingVerdictCard({ sendAction: _ }: { sendAction: unknown }) {
+export function TrainingVerdictCard({ sendAction: _ }: { sendAction?: unknown }) {
   const { getSurface } = useA2UI();
   if (!getSurface("training-verdict")) return null;
 
