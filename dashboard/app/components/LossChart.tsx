@@ -154,12 +154,18 @@ export function LossChart({ onStopRef }: LossChartProps = {}) {
             Training Monitor
           </p>
           {entry && (
-            <p className="text-gray-400 text-xs mt-0.5">
-              {runId} · {entry.config.model} · {entry.config.dataset}
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-xs text-gray-500">{runId}</span>
+              <span className="text-xs text-gray-400">·</span>
+              <span className="text-xs font-semibold text-indigo-300">{entry.config.model}</span>
+              <span className="text-xs text-gray-400">·</span>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded px-1.5 py-0.5">
+                <span>🗄</span>{entry.config.dataset}
+              </span>
               {entry.config.mode_label && (
-                <span className="ml-1 text-yellow-500">({entry.config.mode_label})</span>
+                <span className="text-xs font-semibold text-yellow-400">({entry.config.mode_label})</span>
               )}
-            </p>
+            </div>
           )}
         </div>
         <div className="flex gap-2 items-center">

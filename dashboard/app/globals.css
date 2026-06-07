@@ -19,57 +19,76 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ── A2UI dark theme ──────────────────────────────────────────────────────── */
-/* A2UI renders with inline styles (white bg, dark text) — we override below  */
+/* ═══════════════════════════════════════════════════════════════════════════
+   A2UI DARK THEME — kill every white / light surface the renderer injects
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* All text inside A2UI surfaces: white */
-.a2ui-dark {
-  color: #f3f4f6;
+/* Force ALL elements inside .a2ui-dark to inherit dark background */
+.a2ui-dark,
+.a2ui-dark * {
+  color: #e5e7eb;
+  box-sizing: border-box;
 }
 
+/* Nuke any inline white/light backgrounds the A2UI Card component adds */
+.a2ui-dark div[style],
+.a2ui-dark section[style],
+.a2ui-dark article[style] {
+  background-color: transparent !important;
+  border-color: #374151 !important;
+  color: #e5e7eb !important;
+}
+
+/* Specifically target the white Card wrapper A2UI renders */
+.a2ui-dark > * > div,
+.a2ui-dark div > div {
+  background-color: transparent !important;
+  color: #e5e7eb !important;
+}
+
+/* Text nodes */
 .a2ui-dark p,
 .a2ui-dark span,
-.a2ui-dark div {
-  color: inherit;
+.a2ui-dark h1,
+.a2ui-dark h2,
+.a2ui-dark h3,
+.a2ui-dark h4,
+.a2ui-dark label {
+  color: #e5e7eb !important;
 }
 
-/* Default buttons: dark gray */
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
 .a2ui-dark button {
-  background-color: #1f2937 !important;
+  background-color: #1e293b !important;
   color: #e5e7eb !important;
-  border: 1px solid #4b5563 !important;
+  border: 1.5px solid #475569 !important;
   border-radius: 8px !important;
   font-size: 13px !important;
+  font-weight: 700 !important;
   font-family: inherit !important;
-  font-weight: 600 !important;
-  padding: 10px 20px !important;
-  transition: background-color 0.15s, border-color 0.15s !important;
+  padding: 10px 22px !important;
+  min-width: 100px !important;
   cursor: pointer !important;
-  min-width: 90px !important;
+  transition: all 0.15s !important;
+  letter-spacing: 0.01em !important;
 }
 
 .a2ui-dark button:hover {
-  background-color: #374151 !important;
-  border-color: #6366f1 !important;
+  background-color: #334155 !important;
+  border-color: #818cf8 !important;
   color: #ffffff !important;
 }
 
-/* Primary buttons — indigo */
+/* Primary / indigo button */
 .a2ui-dark button[style*="007bff"] {
   background-color: #6366f1 !important;
-  border-color: #4f46e5 !important;
+  border-color: #818cf8 !important;
   color: #ffffff !important;
-  box-shadow: 0 0 12px rgba(99,102,241,0.4) !important;
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.45) !important;
 }
 
 .a2ui-dark button[style*="007bff"]:hover {
   background-color: #4f46e5 !important;
-  box-shadow: 0 0 20px rgba(99,102,241,0.6) !important;
-}
-
-/* Card backgrounds inside A2UI */
-.a2ui-dark > * > div[style*="background"] {
-  background-color: #111827 !important;
-  border-color: #374151 !important;
-  color: #f3f4f6 !important;
+  box-shadow: 0 0 22px rgba(99, 102, 241, 0.65) !important;
 }

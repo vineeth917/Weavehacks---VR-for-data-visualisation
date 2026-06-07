@@ -70,12 +70,12 @@ function deriveDetail(agent: string, events: AguiEvent[]): { label: string; valu
 }
 
 const STATE_STYLES: Record<string, string> = {
-  idle:     "bg-gray-900 border-gray-800 opacity-40",
-  active:   "bg-gray-900 border-gray-600",
-  working:  "bg-gray-900 border-yellow-400/80 shadow-yellow-400/15 shadow-lg",
-  speaking: "bg-gray-900 border-pink-400/80 shadow-pink-400/15 shadow-lg",
-  done:     "bg-gray-900 border-green-400/60",
-  error:    "bg-gray-900 border-red-400/70",
+  idle:     "bg-transparent border-gray-800 opacity-50",
+  active:   "bg-transparent border-gray-600",
+  working:  "bg-transparent border-yellow-400/80 shadow-yellow-400/15 shadow-lg",
+  speaking: "bg-transparent border-pink-400/80 shadow-pink-400/15 shadow-lg",
+  done:     "bg-transparent border-green-400/60",
+  error:    "bg-transparent border-red-400/70",
 };
 
 const STATE_LABEL: Record<string, string> = {
@@ -137,7 +137,7 @@ export function AgentStatusGrid({ events }: Props) {
                   <span className="text-gray-600 text-xs">{detail.label}</span>
                 )}
                 <span
-                  className="text-xs font-semibold truncate"
+                  className="text-xs font-semibold break-words"
                   style={{ color: detail.label === "calling" ? "#fbbf24" : detail.label === "says" ? color : "#d1d5db" }}
                 >
                   {detail.value}

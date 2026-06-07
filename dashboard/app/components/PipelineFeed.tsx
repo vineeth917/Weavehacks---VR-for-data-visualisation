@@ -6,6 +6,7 @@ import type { AguiEvent, ConnectionStatus } from "../hooks/useAguiStream";
 interface Props {
   events: AguiEvent[];
   status: ConnectionStatus;
+  datasetName?: string;
 }
 
 const AGENT_COLOR: Record<string, string> = {
@@ -160,7 +161,7 @@ const PIPELINE_TYPES = new Set([
   "HANDOFF","TOOL_CALL_START","TOOL_CALL_END","RUN_STARTED","RUN_FINISHED",
 ]);
 
-export function PipelineFeed({ events, status }: Props) {
+export function PipelineFeed({ events, status, datasetName }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -185,6 +186,15 @@ export function PipelineFeed({ events, status }: Props) {
           <span className={`text-xs font-semibold ${statusColor}`}>{status}</span>
         </div>
       </div>
+
+      {/* Dataset name banner — shown whenever a dataset is known */}
+      {datasetName && (
+        <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex-shrink-0">
+          <span className="text-emerald-400 text-xs">🗄</span>
+          <span className="text-xs text-emerald-300 font-semibold">Dataset:</span>
+          <span className="text-xs text-emerald-200 font-mono">{datasetName}</span>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5">
         {visible.length === 0 ? (
