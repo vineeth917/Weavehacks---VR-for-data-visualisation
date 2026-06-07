@@ -167,7 +167,6 @@ export function useA2UIBridge(backendUrl: string) {
     const es = new EventSource(url);
     esRef.current = es;
 
-    let gotA2UIEvent = false;
     let mocksFed = false;
 
     const doFeedMocks = () => {
@@ -176,16 +175,13 @@ export function useA2UIBridge(backendUrl: string) {
       feedMocks();
     };
 
+    // Only fall back to mocks if the connection itself fails (not just idle)
     const connectTimer = setTimeout(() => {
       if (es.readyState !== EventSource.OPEN) {
         es.close();
         doFeedMocks();
       }
     }, 3000);
-
-    const noEventTimer = setTimeout(() => {
-      if (!gotA2UIEvent) doFeedMocks();
-    }, 5000);
 
     es.onopen = () => clearTimeout(connectTimer);
 
@@ -195,23 +191,17 @@ export function useA2UIBridge(backendUrl: string) {
         // Backend wire format: {type:"CUSTOM", name:"surfaceUpdate"|..., value:{...}, ts}
         if ((raw.type === "CUSTOM" || raw.event === "CUSTOM") && raw.name && raw.value) {
           const envelope = { [raw.name]: (raw.value as Record<string, unknown>)[raw.name as string] ?? raw.value };
-          gotA2UIEvent = true;
-          clearTimeout(noEventTimer);
           feedEnvelope(envelope);
           return;
         }
         // Fallback: args.envelope shape
         if (raw.args?.envelope) {
-          gotA2UIEvent = true;
-          clearTimeout(noEventTimer);
           feedEnvelope(raw.args.envelope as Record<string, unknown>);
           return;
         }
         // Bare envelope
         if (raw.surfaceUpdate || raw.dataModelUpdate || raw.beginRendering ||
             raw.createSurface || raw.updateComponents || raw.updateDataModel) {
-          gotA2UIEvent = true;
-          clearTimeout(noEventTimer);
           feedEnvelope(raw);
         }
       } catch {
@@ -221,14 +211,12 @@ export function useA2UIBridge(backendUrl: string) {
 
     es.onerror = () => {
       clearTimeout(connectTimer);
-      clearTimeout(noEventTimer);
       es.close();
       doFeedMocks();
     };
 
     return () => {
       clearTimeout(connectTimer);
-      clearTimeout(noEventTimer);
       es.close();
     };
   }, [backendUrl, feedEnvelope, feedMocks]);
