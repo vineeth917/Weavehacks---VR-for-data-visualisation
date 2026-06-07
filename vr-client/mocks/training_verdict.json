@@ -1,0 +1,9 @@
+{
+  "type": "training_update",
+  "run_id": "demo-overfit-001",
+  "step": 350,
+  "metrics": {
+    "verdict_code": 1
+  },
+  "status": "done"
+}

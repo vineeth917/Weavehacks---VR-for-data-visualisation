@@ -3,14 +3,75 @@ import { scene } from './scene.js';
 
 const panelMeshes = {};
 
-function createPanelTexture(panel) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
+function toDataUri(b64) {
+  if (!b64 || typeof b64 !== 'string') return null;
+  const trimmed = b64.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('data:')) return trimmed;
+  return `data:image/png;base64,${trimmed}`;
+}
 
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${src.slice(0, 48)}...`));
+    img.src = src;
+  });
+}
+
+function drawPanelCanvas(ctx, panel, chartImage) {
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, 512, 512);
+
+  const titleHeight = 100;
+  const padding = 12;
+
+  if (chartImage) {
+    const chartTop = titleHeight;
+    const chartHeight = 512 - titleHeight - padding;
+    const chartWidth = 512 - padding * 2;
+
+    ctx.fillStyle = '#0d0d0d';
+    ctx.fillRect(padding, chartTop, chartWidth, chartHeight);
+
+    const scale = Math.min(chartWidth / chartImage.width, chartHeight / chartImage.height);
+    const drawW = chartImage.width * scale;
+    const drawH = chartImage.height * scale;
+    const drawX = padding + (chartWidth - drawW) / 2;
+    const drawY = chartTop + (chartHeight - drawH) / 2;
+
+    ctx.drawImage(chartImage, drawX, drawY, drawW, drawH);
+  } else {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '28px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(panel.title || '', 256, 40);
+
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '20px sans-serif';
+    ctx.fillText(panel.column || '', 256, 85);
+
+    ctx.fillStyle = '#555555';
+    ctx.font = '18px sans-serif';
+    ctx.fillText('No chart image', 256, 260);
+  }
+
+  if (chartImage) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(0, 0, 512, titleHeight);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(panel.title || '', 256, 38);
+
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(panel.column || '', 256, 68);
+  }
 
   const hasAlertFlags =
     panel.flags?.includes('right_skewed') || panel.flags?.includes('outliers');
@@ -24,19 +85,31 @@ function createPanelTexture(panel) {
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, 510, 510);
   }
+}
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '28px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(panel.title || '', 256, 40);
+function createPanelTexture(panel) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#aaaaaa';
-  ctx.font = '20px sans-serif';
-  ctx.fillText(panel.column || '', 256, 85);
+  drawPanelCanvas(ctx, panel, null);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
+
+  const dataUri = toDataUri(panel.image_b64);
+  if (dataUri) {
+    loadImage(dataUri)
+      .then((img) => {
+        drawPanelCanvas(ctx, panel, img);
+        texture.needsUpdate = true;
+      })
+      .catch((err) => {
+        console.warn(`Panel ${panel.id}: chart image failed to load`, err);
+      });
+  }
+
   return texture;
 }
 

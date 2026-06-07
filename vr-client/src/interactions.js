@@ -9,7 +9,9 @@ const mouse = new THREE.Vector2();
 let sceneRef = null;
 let cameraRef = null;
 let rendererRef = null;
+let uiHandler = null;
 let initialized = false;
+const controllerRays = [];
 
 function getInteractableMeshes() {
   if (!sceneRef) return [];
@@ -24,7 +26,13 @@ function getInteractableMeshes() {
 }
 
 function handleSelect(intersect) {
-  const { kind, id } = intersect.object.userData;
+  const { kind, id, action } = intersect.object.userData;
+
+  if (kind === 'ui') {
+    uiHandler?.(action);
+    return;
+  }
+
   if (!id) return;
 
   sendInteraction('select_point', { target_id: id });
@@ -33,6 +41,8 @@ function handleSelect(intersect) {
 
 function handleGrab(intersect) {
   const { kind, id } = intersect.object.userData;
+
+  if (kind === 'ui') return;
 
   if (kind === 'point') {
     const worldPos = new THREE.Vector3();
@@ -68,6 +78,13 @@ function raycastFromController(controller) {
   return raycaster.intersectObjects(getInteractableMeshes(), false);
 }
 
+function onControllerAction(controller, handler) {
+  const intersects = raycastFromController(controller);
+  if (intersects.length > 0) {
+    handler(intersects[0]);
+  }
+}
+
 function onMouseClick(event) {
   const intersects = raycastFromCamera(event.clientX, event.clientY);
   if (intersects.length === 0) return;
@@ -82,29 +99,35 @@ function onMouseClick(event) {
 function setupXRController(index) {
   const controller = rendererRef.xr.getController(index);
 
-  controller.addEventListener('selectstart', () => {
-    const intersects = raycastFromController(controller);
-    if (intersects.length > 0) {
-      handleSelect(intersects[0]);
-    }
-  });
+  const rayGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -4),
+  ]);
+  const ray = new THREE.Line(
+    rayGeometry,
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 })
+  );
+  controller.add(ray);
+  controllerRays.push(ray);
 
-  controller.addEventListener('squeezestart', () => {
-    const intersects = raycastFromController(controller);
-    if (intersects.length > 0) {
-      handleGrab(intersects[0]);
-    }
-  });
+  const onSelect = () => onControllerAction(controller, handleSelect);
+  const onSqueeze = () => onControllerAction(controller, handleGrab);
+
+  controller.addEventListener('select', onSelect);
+  controller.addEventListener('selectstart', onSelect);
+  controller.addEventListener('squeeze', onSqueeze);
+  controller.addEventListener('squeezestart', onSqueeze);
 
   sceneRef.add(controller);
 }
 
-export function initInteractions(scene, camera, renderer) {
+export function initInteractions(scene, camera, renderer, onUIAction) {
   if (initialized) return;
 
   sceneRef = scene;
   cameraRef = camera;
   rendererRef = renderer;
+  uiHandler = onUIAction;
   initialized = true;
 
   renderer.domElement.addEventListener('click', onMouseClick);

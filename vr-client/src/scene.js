@@ -5,13 +5,27 @@ export let scene;
 export let camera;
 export let renderer;
 
+let onSessionStartCallback = null;
+let bootstrapped = false;
+
+export function onXRSessionStart(fn) {
+  onSessionStartCallback = fn;
+}
+
 export function initScene() {
-  renderer = new THREE.WebGLRenderer();
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
   renderer.xr.enabled = true;
+  renderer.xr.setReferenceSpaceType('local-floor');
   document.body.appendChild(VRButton.createButton(renderer));
+
+  renderer.xr.addEventListener('sessionstart', () => {
+    console.log('VR session started');
+    onSessionStartCallback?.();
+  });
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
@@ -24,10 +38,10 @@ export function initScene() {
   );
   camera.position.set(0, 1.6, 3);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
   scene.add(ambientLight);
 
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
   directionalLight.position.set(5, 10, 5);
   scene.add(directionalLight);
 
@@ -45,4 +59,10 @@ export function initScene() {
   renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
   });
+}
+
+export function shouldBootstrapData() {
+  if (bootstrapped) return false;
+  bootstrapped = true;
+  return true;
 }

@@ -1,4 +1,4 @@
-const WS_URL = 'ws://localhost:8080/ws';
+const WS_URL = 'wss://scenic-willow-recall-timothy.trycloudflare.com/ws';
 const SESSION_ID = 's1';
 const RECONNECT_DELAY_MS = 3000;
 
@@ -19,6 +19,21 @@ function dispatchMessage(msg) {
 
 export function onMessage(type, fn) {
   handlers[type] = fn;
+}
+
+export function isConnected() {
+  return mockMode || ws?.readyState === WebSocket.OPEN;
+}
+
+const connectionListeners = new Set();
+
+export function onConnectionChange(fn) {
+  connectionListeners.add(fn);
+  fn(isConnected());
+}
+
+function notifyConnection(connected) {
+  connectionListeners.forEach((fn) => fn(connected));
 }
 
 function send(payload) {
@@ -48,6 +63,10 @@ export function sendCommand(action, params = {}) {
     params,
     session_id: SESSION_ID,
   });
+}
+
+export function sendLoadRun(run = 'overfit') {
+  sendCommand('load_run', { run });
 }
 
 export function sendInteraction(action, fields = {}) {
@@ -139,6 +158,7 @@ function connect() {
 
   ws.addEventListener('open', () => {
     console.log('WebSocket connected');
+    notifyConnection(true);
   });
 
   ws.addEventListener('message', (event) => {
@@ -152,6 +172,7 @@ function connect() {
 
   ws.addEventListener('close', () => {
     console.log('WebSocket disconnected');
+    notifyConnection(false);
     scheduleReconnect();
   });
 
@@ -166,6 +187,7 @@ function normalizeMessage(data, type) {
 
 async function runMockMode() {
   console.log('Mock mode enabled — skipping WebSocket connection');
+  notifyConnection(true);
 
   setTimeout(async () => {
     try {
@@ -189,18 +211,11 @@ async function runMockMode() {
 
   setTimeout(async () => {
     try {
-      const resp = await fetch('/mocks/training_updates.json');
+      const resp = await fetch('/mocks/training_verdict.json');
       const data = await resp.json();
-      const items = Array.isArray(data) ? data : data.updates ?? [data];
-
-      for (let i = 0; i < items.length; i++) {
-        if (i > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 150));
-        }
-        dispatchMessage(normalizeMessage(items[i], 'training_update'));
-      }
+      dispatchMessage(normalizeMessage(data, 'training_update'));
     } catch (err) {
-      console.error('Failed to load training_updates mock', err);
+      console.error('Failed to load training_verdict mock', err);
     }
   }, 3000);
 

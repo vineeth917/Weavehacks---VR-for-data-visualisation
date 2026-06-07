@@ -22,6 +22,7 @@
       position: absolute;
       top: 20px;
       left: 20px;
+      z-index: 10;
       color: white;
       background: #333;
       padding: 10px 20px;
@@ -36,30 +37,59 @@
   <button id="mic-btn">Enable Mic</button>
 
   <script type="module">
-    import { initScene, scene, camera, renderer } from './src/scene.js';
-    import { onMessage, sendQuery } from './src/ws.js';
+    import { initScene, scene, camera, renderer, onXRSessionStart, shouldBootstrapData } from './src/scene.js';
+    import { onMessage, sendQuery, sendLoadRun, onConnectionChange } from './src/ws.js';
     import { renderPanels } from './src/panels.js';
     import { renderScatter } from './src/scatter3d.js';
-    import { initRibbon, addTrainingStep } from './src/loss_ribbon.js';
-    import { initVoice, speak } from './src/voice.js';
+    import { initTrainingDisplay, showTrainingVerdict, clearTrainingDisplay } from './src/training_verdict.js';
+    import { initVoice, speak, startListening, onMicStateChange } from './src/voice.js';
     import { renderKDESurface, renderCorrField } from './src/renderers.js';
     import { highlightTargets } from './src/highlight.js';
     import { initInteractions } from './src/interactions.js';
+    import { renderReport } from './src/report.js';
+    import { initVRUI } from './src/vr_ui.js';
+
+    function handleVoiceQuery(transcript) {
+      console.log('Voice query:', transcript);
+      const needsTrainingRun = /\b(overfit|overfitting|training|train loss|val loss|validation loss|loss curve|my model)\b/i.test(transcript);
+      if (needsTrainingRun) {
+        clearTrainingDisplay();
+        initTrainingDisplay();
+        sendLoadRun('overfit');
+      }
+      sendQuery(transcript);
+    }
 
     initScene();
-    initInteractions(scene, camera, renderer);
+
+    const vrUi = initVRUI(camera, renderer, {
+      onMic: () => startListening(),
+      onExit: () => {},
+      onStatusChange: (setStatus) => onConnectionChange(setStatus),
+    });
+
+    initInteractions(scene, camera, renderer, (action) => vrUi.handleUIAction(action));
+    initVoice(handleVoiceQuery);
+    onMicStateChange((active) => vrUi.setMicListening(active));
+
+    onXRSessionStart(() => {
+      if (shouldBootstrapData()) {
+        sendQuery('show EDA of all my columns');
+      }
+      vrUi.updateStatus('Look forward for charts · Mic below');
+    });
 
     onMessage('panels', (msg) => renderPanels(msg));
     onMessage('highlight', (msg) => highlightTargets(msg.target_ids));
     onMessage('scatter3d', (msg) => renderScatter(msg));
-    initRibbon();
-    onMessage('training_update', (msg) => addTrainingStep(msg));
-    initVoice((transcript) => {
-      console.log('Voice query:', transcript);
-      sendQuery(transcript);
-    });
+    initTrainingDisplay();
+    onMessage('training_update', (msg) => showTrainingVerdict(msg));
     onMessage('speech', (msg) => speak(msg.text));
-    onMessage('report', (msg) => speak(msg.speak ? msg.verdict : ''));
+    onMessage('report', (msg) => {
+      renderReport(msg);
+      const text = msg.narration ?? msg.summary ?? msg.text;
+      if (text) speak(text);
+    });
     onMessage('kde_surface', (msg) => renderKDESurface(msg));
     onMessage('corr_field', (msg) => renderCorrField(msg));
   </script>
