@@ -433,7 +433,7 @@ async def _build_and_send_panels(
         rendered.append(Panel.model_validate(panel_clean))
 
     if rendered:
-        await ws.send_json(Panels(panels=rendered).model_dump())
+        await _send(ws,Panels(panels=rendered).model_dump())
     return len(rendered)
 
 
@@ -475,7 +475,7 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
             sid=sid, name=action, surface_id=msg.target_id,
             context=msg.context, via="WS /ws interaction",
         )
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="router", state="done",
                         message=f"a2ui action: {action} {msg.context}").model_dump()
         )
@@ -484,7 +484,7 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
     # ---- 2. spatial selections → real EDA agent ----
     if action in ("select_point", "select_panel", "grab_region"):
         targets = msg.point_ids or ([msg.target_id] if msg.target_id else [])
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="eda", state="thinking",
                         message=f"{action} on {len(targets)} target(s)").model_dump()
         )
@@ -498,14 +498,14 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
             )
         except Exception as e:  # noqa: BLE001
             log.exception("eda interaction agent failed")
-            await ws.send_json(
+            await _send(ws,
                 AgentStatus(agent="eda", state="error",
                             message=f"agent error: {e}").model_dump()
             )
             return
 
-        await ws.send_json(Speech(agent="eda", text=out.speech).model_dump())
-        await ws.send_json(
+        await _send(ws,Speech(agent="eda", text=out.speech).model_dump())
+        await _send(ws,
             Highlight(target_ids=targets,
                       reason=action).model_dump()
         )
@@ -518,11 +518,11 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
         if out.findings:
             _emit_findings_surface(out.findings, sid)
 
-        await ws.send_json(AgentStatus(agent="eda", state="done").model_dump())
+        await _send(ws,AgentStatus(agent="eda", state="done").model_dump())
         return
 
     # ---- 3. unknown action ----
-    await ws.send_json(
+    await _send(ws,
         AgentStatus(agent="router", state="error",
                     message=f"unknown interaction action: {action}").model_dump()
     )
@@ -545,10 +545,10 @@ async def _send_narrator_report(ws: WebSocket, out, sid: str) -> None:
         verdict=str(out.verdict or "mixed"),
         sections=sections,
     )
-    await ws.send_json(report.model_dump())
+    await _send(ws,report.model_dump())
     # Mirror the spoken summary as a Speech frame so STT-driven flows feel natural.
     if out.speech:
-        await ws.send_json(Speech(agent="narrator", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="narrator", text=out.speech).model_dump())
     # Cache the latest narrative under scratch so the dashboard can refetch.
     redis_state.set_scratch(sid, "narrator_last", {
         "speech": out.speech,
@@ -574,7 +574,7 @@ def _emit_training_verdict_surface(out, sid: str) -> None:
 
 async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
     sid = msg.session_id
-    await ws.send_json(
+    await _send(ws,
         AgentStatus(agent="router", state="thinking",
                     message=f"received: {msg.text!r}").model_dump()
     )
@@ -593,7 +593,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
         result = await router_agent.route(sid=sid, text=msg.text, ctx=ctx)
     except Exception as e:  # noqa: BLE001
         log.exception("router failed")
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="router", state="error",
                         message=f"router error: {e}").model_dump()
         )
@@ -602,12 +602,12 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
     # ---- specialist: EDA ----
     if result.target == "eda" and result.eda is not None:
         out = result.eda
-        await ws.send_json(Speech(agent="eda", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="eda", text=out.speech).model_dump())
         n_panels = await _build_and_send_panels(ws, df, out.panel_specs, agent_name="eda")
         _emit_findings_surface(out.findings, sid)
         log.info("voice_query sid=%s -> eda  panels=%d findings=%d ds=%s",
                  sid, n_panels, len(out.findings), dataset_name)
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="eda", state="done",
                         message=f"panels={n_panels} findings={len(out.findings)} ds={dataset_name}").model_dump()
         )
@@ -620,7 +620,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
         out = result.trainer
         metrics_rows = out.metrics or []
         for i, row in enumerate(metrics_rows):
-            await ws.send_json(TrainingUpdate(
+            await _send(ws,TrainingUpdate(
                 run_id=out.run_id or active_run,
                 step=int(row.get("step", i)),
                 metrics={
@@ -629,7 +629,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
                 },
                 status="running" if i < len(metrics_rows) - 1 else "done",
             ).model_dump())
-        await ws.send_json(Speech(agent="trainer", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="trainer", text=out.speech).model_dump())
         if out.run_id:
             run_registry.set_active(sid, out.run_id)
         log.info(
@@ -637,7 +637,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
             sid, out.run_id, out.n_epochs, out.final_train_loss,
             out.final_val_loss, out.wandb_url,
         )
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(
                 agent="trainer",
                 state="done",
@@ -656,16 +656,16 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
             and result.target == "evals"
             and result.evals is not None):
         out = result.evals
-        await ws.send_json(Speech(agent="evals", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="evals", text=out.speech).model_dump())
         if out.panels:
-            await ws.send_json(Panels(panels=out.panels).model_dump())
+            await _send(ws,Panels(panels=out.panels).model_dump())
         m = out.metrics or {}
         log.info(
             "voice_query sid=%s -> evals kind=%s target=%s v%s acc=%s",
             sid, out.problem_type, out.target_column, out.version,
             m.get("accuracy", m.get("rmse")),
         )
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(
                 agent="evals",
                 state="done",
@@ -684,7 +684,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
         await _send_narrator_report(ws, out, sid)
         log.info("voice_query sid=%s -> narrator verdict=%s sections=%d",
                  sid, out.verdict, len(out.sections))
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="narrator", state="done",
                         message=f"verdict={out.verdict} sections={len(out.sections)}").model_dump()
         )
@@ -696,7 +696,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
             and result.preprocessor is not None):
         out = result.preprocessor
         _, panel_df = _session_dataset(sid)
-        await ws.send_json(Speech(agent="preprocessor", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="preprocessor", text=out.speech).model_dump())
         specs = out.panel_specs or preprocessor_agent.build_panel_specs_fallback(sid)
         n_panels = await _build_and_send_panels(
             ws, panel_df, specs, agent_name="preprocessor",
@@ -705,7 +705,7 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
             "voice_query sid=%s -> preprocessor mode=%s v%d→v%s panels=%d",
             sid, out.mode, out.version_before, out.version_after, n_panels,
         )
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(
                 agent="preprocessor",
                 state="done",
@@ -726,10 +726,10 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
             "target_column": out.target_column,
             "model_suggestion": out.model_suggestion,
         })
-        await ws.send_json(Speech(agent="problem_type", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="problem_type", text=out.speech).model_dump())
         log.info("voice_query sid=%s -> problem_type kind=%s target=%s model=%s",
                  sid, out.problem_type, out.target_column, out.model_suggestion)
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="problem_type", state="done",
                         message=(f"problem_type={out.problem_type} "
                                  f"target={out.target_column} "
@@ -740,9 +740,9 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
     # ---- specialist: training_monitor ----
     if result.target == "training_monitor" and result.training is not None:
         out = result.training
-        await ws.send_json(Speech(agent="training_monitor", text=out.speech).model_dump())
+        await _send(ws,Speech(agent="training_monitor", text=out.speech).model_dump())
         # one training_update frame for the VR client (PLAN §6.2)
-        await ws.send_json(TrainingUpdate(
+        await _send(ws,TrainingUpdate(
             run_id=out.run_id or active_run,
             step=int(out.step or 0),
             metrics={"verdict_code": {"healthy": 0, "overfitting": 1,
@@ -753,14 +753,14 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
         _emit_training_verdict_surface(out, sid)
         log.info("voice_query sid=%s -> training_monitor verdict=%s run=%s step=%d",
                  sid, out.verdict, out.run_id, out.step)
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="training_monitor", state="done",
                         message=f"verdict={out.verdict} action={out.suggested_action} run={out.run_id}").model_dump()
         )
         return
 
     # ---- nothing usable ----
-    await ws.send_json(
+    await _send(ws,
         AgentStatus(agent="router", state="error",
                     message=f"router produced no usable output (target={result.target})").model_dump()
     )
@@ -776,19 +776,19 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
                 await asyncio.to_thread(dataset_versions.snapshot_v0, sid, name, df)
                 preprocessor_agent.reset_preprocessor_scratch(sid)
         except Exception as e:  # noqa: BLE001
-            await ws.send_json(
+            await _send(ws,
                 AgentStatus(agent="router", state="error",
                             message=f"load_dataset {name}: {e}").model_dump()
             )
             return
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="router", state="done",
                         message=f"dataset loaded: {name} shape={df.shape}").model_dump()
         )
         return
 
     if msg.action == "narrate":
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="narrator", state="thinking",
                         message="rolling up session state").model_dump()
         )
@@ -796,13 +796,13 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
             out = await narrator_agent.run_narrator(sid, text=(msg.params or {}).get("text"))
         except Exception as e:  # noqa: BLE001
             log.exception("narrator failed")
-            await ws.send_json(
+            await _send(ws,
                 AgentStatus(agent="narrator", state="error",
                             message=f"narrator: {e}").model_dump()
             )
             return
         await _send_narrator_report(ws, out, sid)
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="narrator", state="done",
                         message=f"verdict={out.verdict} sections={len(out.sections)}").model_dump()
         )
@@ -811,7 +811,7 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
     if msg.action == "load_run":
         run_id = (msg.params or {}).get("run_id", run_registry.DEFAULT_RUN)
         run_registry.set_active(sid, run_id)
-        await ws.send_json(
+        await _send(ws,
             AgentStatus(agent="router", state="done",
                         message=f"active run set: {run_id}").model_dump()
         )
@@ -826,7 +826,7 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
             preprocessor_agent.reset_preprocessor_scratch(sid)
         log.info("reset session=%s purged_keys=%d", sid, n)
 
-    await ws.send_json(
+    await _send(ws,
         AgentStatus(agent="router", state="done",
                     message=f"command acknowledged: {msg.action}").model_dump()
     )
@@ -849,6 +849,12 @@ async def _handle_message(ws: WebSocket, msg: ClientMessage) -> None:
         await _handle_interaction(ws, iact)
 
 
+async def _send(ws: WebSocket, payload: dict) -> None:
+    """Send to WS client and mirror to /agui SSE for spectator dashboard."""
+    await ws.send_json(payload)
+    a2ui_emitter.emit_agui(payload.get("type", "unknown"), payload)
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     await ws.accept()
@@ -861,7 +867,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
                 payload = json.loads(raw)
                 msg = _ClientMessage.validate_python(payload)
             except (json.JSONDecodeError, ValidationError) as e:
-                await ws.send_json(
+                await _send(ws,
                     AgentStatus(agent="router", state="error",
                                 message=f"bad message: {e}").model_dump()
                 )
