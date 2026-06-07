@@ -41,15 +41,29 @@ export function useA2UIBridge(backendUrl: string) {
     const es = new EventSource(url);
     esRef.current = es;
 
+    let gotA2UIEvent = false;
+    let mocksFed = false;
+
+    const doFeedMocks = () => {
+      if (mocksFed) return;
+      mocksFed = true;
+      feedMocks();
+    };
+
     // Fall back to mocks if backend doesn't connect in 3s
-    const fallbackTimer = setTimeout(() => {
+    const connectTimer = setTimeout(() => {
       if (es.readyState !== EventSource.OPEN) {
         es.close();
-        feedMocks();
+        doFeedMocks();
       }
     }, 3000);
 
-    es.onopen = () => clearTimeout(fallbackTimer);
+    // Also fall back if connected but no A2UI CUSTOM events arrive within 5s
+    const noEventTimer = setTimeout(() => {
+      if (!gotA2UIEvent) doFeedMocks();
+    }, 5000);
+
+    es.onopen = () => clearTimeout(connectTimer);
 
     es.onmessage = (e) => {
       try {
@@ -57,16 +71,22 @@ export function useA2UIBridge(backendUrl: string) {
         // Backend wire format (backend/a2ui/emitter.py):
         //   { type:"CUSTOM", name:"surfaceUpdate"|"dataModelUpdate"|"beginRendering", value:{...}, ts:... }
         if ((raw.type === "CUSTOM" || raw.event === "CUSTOM") && raw.name && raw.value) {
+          gotA2UIEvent = true;
+          clearTimeout(noEventTimer);
           processMessages([{ [raw.name]: raw.value }]);
           return;
         }
         // Fallback: args.envelope shape (older draft)
         if (raw.args?.envelope) {
+          gotA2UIEvent = true;
+          clearTimeout(noEventTimer);
           processMessages([raw.args.envelope as Record<string, unknown>]);
           return;
         }
         // Fallback: bare envelope
         if (raw.surfaceUpdate || raw.dataModelUpdate || raw.beginRendering) {
+          gotA2UIEvent = true;
+          clearTimeout(noEventTimer);
           processMessages([raw]);
         }
       } catch {
@@ -75,13 +95,15 @@ export function useA2UIBridge(backendUrl: string) {
     };
 
     es.onerror = () => {
-      clearTimeout(fallbackTimer);
+      clearTimeout(connectTimer);
+      clearTimeout(noEventTimer);
       es.close();
-      feedMocks();
+      doFeedMocks();
     };
 
     return () => {
-      clearTimeout(fallbackTimer);
+      clearTimeout(connectTimer);
+      clearTimeout(noEventTimer);
       es.close();
     };
   }, [backendUrl, processMessages, feedMocks]);
