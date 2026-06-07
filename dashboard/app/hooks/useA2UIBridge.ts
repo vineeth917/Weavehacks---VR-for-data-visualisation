@@ -16,6 +16,8 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useA2UIActions } from "@copilotkit/a2ui-renderer";
 
+const SESSION_ID = "demo-session-1";
+
 export function useA2UIBridge(backendUrl: string) {
   const { processMessages, dispatch } = useA2UIActions();
   const esRef = useRef<EventSource | null>(null);
@@ -88,6 +90,7 @@ export function useA2UIBridge(backendUrl: string) {
   const sendAction = useCallback(
     (actionName: string, surfaceId: string, context: Record<string, unknown> = {}) => {
       const msg = {
+        session_id: SESSION_ID,
         userAction: {
           name: actionName,
           surfaceId,
@@ -97,14 +100,15 @@ export function useA2UIBridge(backendUrl: string) {
       };
       // Tell the A2UI store (for local state)
       dispatch(msg);
-      // Send to backend over a fire-and-forget POST
+      // POST to backend — success = 200 {ok:true} + USER_ACTION on /agui SSE
       fetch(`${backendUrl}/agui/action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(msg),
-      }).catch(() => {
-        // backend may not have the endpoint yet — silently ignore
-      });
+      })
+        .then((r) => r.json())
+        .then((r) => console.log("[a2ui action]", actionName, r))
+        .catch((e) => console.warn("[a2ui action] POST failed", e));
     },
     [backendUrl, dispatch]
   );
