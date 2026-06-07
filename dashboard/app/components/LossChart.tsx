@@ -15,26 +15,39 @@ import {
 
 interface HistoryPoint {
   step: number;
+  epoch: number;
   train_loss: number;
   val_loss: number;
   train_acc: number;
   val_acc: number;
+  [key: string]: unknown; // unknown future metrics must not crash
 }
 
-interface RunMeta {
-  run_id: string;
-  run_name: string;
-  dataset: string;
-  model: string;
-  best_step: number;
-  status: string;
-  summary: {
-    verdict: string;
-    overfit_detected_at_step: number;
-    best_val_loss: number;
-  };
-  history: HistoryPoint[];
+interface RunSummary {
+  final_train_loss: number;
+  final_val_loss: number;
+  best_val_loss: number;
+  best_val_loss_step: number;
+  best_val_loss_epoch: number;
 }
+
+interface RunEntry {
+  run_id?: string;
+  config: {
+    model: string;
+    dataset: string;
+    lr: number;
+    batch_size: number;
+    epochs: number;
+    steps_per_epoch: number;
+    mode_label?: string;
+  };
+  metrics: HistoryPoint[];
+  summary: RunSummary;
+}
+
+// File is { "<run_id>": RunEntry, ... }
+type ReplayFile = Record<string, RunEntry>;
 
 // Custom tooltip so it looks sharp on the projector
 function CustomTooltip({ active, payload, label }: any) {
@@ -56,20 +69,25 @@ export function LossChart() {
   const [visibleCount, setVisibleCount] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVerdict, setShowVerdict] = useState(false);
-  const [meta, setMeta] = useState<RunMeta | null>(null);
+  const [runId, setRunId] = useState<string>("");
+  const [entry, setEntry] = useState<RunEntry | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch("/replay_run_history.json")
       .then((r) => r.json())
-      .then((data: RunMeta) => {
-        setMeta(data);
-        setAllData(data.history);
+      .then((data: ReplayFile) => {
+        // Pick the overfit run for the demo; fall back to first run
+        const id = Object.keys(data).find((k) => k.includes("overfit")) ?? Object.keys(data)[0];
+        const run = data[id];
+        setRunId(id);
+        setEntry(run);
+        setAllData(run.metrics);
       });
   }, []);
 
   const visibleData = allData.slice(0, visibleCount);
-  const overfitStep = meta?.best_step ?? 90;
+  const overfitStep = entry?.summary.best_val_loss_step ?? 90;
   const overfitVisible =
     visibleData.length > 0 && visibleData[visibleData.length - 1].step >= overfitStep;
 
@@ -116,9 +134,12 @@ export function LossChart() {
           <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">
             Training Monitor
           </p>
-          {meta && (
+          {entry && (
             <p className="text-gray-400 text-xs mt-0.5">
-              {meta.run_name} · {meta.model} · {meta.dataset}
+              {runId} · {entry.config.model} · {entry.config.dataset}
+              {entry.config.mode_label && (
+                <span className="ml-1 text-yellow-500">({entry.config.mode_label})</span>
+              )}
             </p>
           )}
         </div>
@@ -206,7 +227,7 @@ export function LossChart() {
       </div>
 
       {/* Verdict banner */}
-      {showVerdict && meta?.summary && (
+      {showVerdict && entry?.summary && (
         <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-3 py-2 flex items-start gap-2">
           <span className="text-yellow-400 text-sm mt-0.5">⚠</span>
           <div>
@@ -214,7 +235,8 @@ export function LossChart() {
               Training Monitor verdict
             </p>
             <p className="text-yellow-200/80 text-xs mt-0.5">
-              {meta.summary.verdict}
+              val_loss bottoms at {entry.summary.best_val_loss.toFixed(4)} @ step {entry.summary.best_val_loss_step} (epoch {entry.summary.best_val_loss_epoch}),
+              then rises to {entry.summary.final_val_loss.toFixed(4)} — overfitting detected.
             </p>
           </div>
         </div>
