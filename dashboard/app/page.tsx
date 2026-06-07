@@ -1,7 +1,6 @@
 "use client";
 
 import { useAguiStream } from "./hooks/useAguiStream";
-import { useWsSpectator } from "./hooks/useWsSpectator";
 import { EventTimeline } from "./components/EventTimeline";
 import { AgentStatusGrid } from "./components/AgentStatusGrid";
 import { SwarmGraph } from "./components/SwarmGraph";
@@ -14,12 +13,9 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:808
 
 export default function Dashboard() {
   const { events, status, replayMock } = useAguiStream(BACKEND_URL);
-  const { events: wsEvents, status: wsStatus } = useWsSpectator(BACKEND_URL);
 
-  // Latest voice query from the Quest
-  const lastQuery = [...wsEvents].reverse().find(
-    (e) => e.type === "voice_query" && e.text !== "__spectator_ping__"
-  );
+  // Latest voice query from the Quest (now comes through /agui via _send mirror)
+  const lastQuery = [...events].reverse().find((e) => e.type === "voice_query" && e.text);
 
   return (
     <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">
@@ -72,9 +68,9 @@ export default function Dashboard() {
           <A2UIPanel backendUrl={BACKEND_URL} />
         </div>
 
-        {/* Col 4: Live pipeline feed (from Quest WS) */}
+        {/* Col 4: Live pipeline feed (mirrored from /ws via /agui) */}
         <div className="flex flex-col min-h-0">
-          <PipelineFeed events={wsEvents} wsStatus={wsStatus} />
+          <PipelineFeed events={events} status={status} />
         </div>
 
         {/* Col 5: AG-UI event stream */}

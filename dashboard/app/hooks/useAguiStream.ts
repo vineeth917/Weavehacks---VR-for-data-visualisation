@@ -9,7 +9,14 @@ export type AguiEventType =
   | "TOOL_CALL_END"
   | "STATE_DELTA"
   | "HANDOFF"
-  | "RUN_FINISHED";
+  | "RUN_FINISHED"
+  | "speech"
+  | "agent_status"
+  | "voice_query"
+  | "report"
+  | "panels"
+  | "training_update"
+  | "CUSTOM";
 
 export interface AguiEvent {
   id: string;
@@ -20,6 +27,10 @@ export interface AguiEvent {
   args?: Record<string, unknown>;
   result?: string;
   message?: string;
+  // pipeline-specific fields (mirrored from /ws via _send)
+  text?: string;
+  state?: string;
+  sections?: { heading?: string; body?: string }[];
   ts: number;
   wallTs: number;
 }
@@ -100,18 +111,30 @@ export function useAguiStream(backendUrl: string) {
         const raw = JSON.parse(e.data);
         // Backend sends {event, agent, tool, args, result, ts (unix secs)}
         // Normalize to our internal shape {type, agent, tool, args, result, message, ts (ms)}
+        // CUSTOM events carry mirrored /ws pipeline frames in raw.value
+        const isCustom = (raw.event === "CUSTOM" || raw.type === "CUSTOM");
+        const value = (raw.value ?? raw.args ?? {}) as Record<string, unknown>;
+        const pipelineType = isCustom ? (raw.name as AguiEventType | undefined) : undefined;
+        const effectiveType = (pipelineType ?? raw.event ?? raw.type) as AguiEventType;
+
         const normalized: Omit<AguiEvent, "id" | "wallTs"> = {
-          type: (raw.event ?? raw.type) as AguiEventType,
-          agent: raw.agent ?? "system",
-          to: raw.to,
-          tool: raw.tool,
-          args: raw.args,
+          type: effectiveType,
+          agent: (raw.agent ?? value.agent ?? "system") as string,
+          to: raw.to as string | undefined,
+          tool: raw.tool as string | undefined,
+          args: isCustom ? value : raw.args as Record<string, unknown> | undefined,
           result: raw.result != null ? String(raw.result) : undefined,
-          message: raw.message ?? raw.args?.message as string | undefined,
+          message: (raw.message ?? value.message ?? raw.args?.message) as string | undefined,
+          text: (value.text ?? value.speech) as string | undefined,
+          state: value.state as string | undefined,
+          sections: value.sections as { heading?: string; body?: string }[] | undefined,
           ts: raw.ts > 1_000_000_000 ? Math.round(raw.ts * 1000) : raw.ts,
         };
         // Skip bare heartbeat STATE_DELTAs from the phase-0 stub
         if (normalized.type === "STATE_DELTA" && normalized.agent === "system") return;
+        // Skip A2UI surface CUSTOM events — handled by useA2UIBridge
+        if (isCustom && ["surfaceUpdate","dataModelUpdate","beginRendering",
+            "createSurface","updateComponents","updateDataModel"].includes(raw.name as string)) return;
         pushEvent(assignId(normalized));
       } catch {
         // ignore malformed events
