@@ -9,9 +9,11 @@ orchestrator before the agent runs.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import pandas as pd
+
+EpochCallback = Callable[[dict[str, Any]], Awaitable[None] | None]
 
 
 @dataclass
@@ -21,3 +23,4 @@ class OrchestratorContext:
     df: pd.DataFrame | None = None
     active_run_id: str | None = None
     scratch: dict[str, Any] = field(default_factory=dict)
+    on_training_epoch: EpochCallback | None = None

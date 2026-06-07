@@ -320,9 +320,13 @@ async def _handle_user_action(*, sid: str, name: str, surface_id: str | None,
     redis_state.push_memory(sid, {"role": "action", "action": iact.action,
                                    "context": iact.context, "via": via,
                                    "ts": time.time()})
+    if name == "stop_training":
+        trainer_agent.request_training_stop()
+        log.info("[agui/action] stop_training — halting training loop (session=%s)", sid)
+
     log.info("user_action sid=%s name=%s surface=%s via=%s",
              sid, name, surface_id, via)
-    return {"ok": True, "interaction": iact.model_dump()}
+    return {"ok": True, "received": name, "interaction": iact.model_dump()}
 
 
 @app.post("/agui/action")
@@ -589,6 +593,20 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
         active_run_id=active_run,
     )
 
+    async def _stream_training_epoch(row: dict[str, Any]) -> None:
+        ctx.scratch["training_streamed"] = True
+        await _send(ws, TrainingUpdate(
+            run_id=str(row.get("run_id") or active_run or ""),
+            step=int(row.get("step", 0)),
+            metrics={
+                "train_loss": float(row.get("train_loss", 0.0)),
+                "val_loss": float(row.get("val_loss", 0.0)),
+            },
+            status="running",
+        ).model_dump())
+
+    ctx.on_training_epoch = _stream_training_epoch
+
     try:
         result = await router_agent.route(sid=sid, text=msg.text, ctx=ctx)
     except Exception as e:  # noqa: BLE001
@@ -619,16 +637,29 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
             and result.trainer is not None):
         out = result.trainer
         metrics_rows = out.metrics or []
-        for i, row in enumerate(metrics_rows):
-            await _send(ws,TrainingUpdate(
+        if ctx.scratch.get("training_streamed") and metrics_rows:
+            last = metrics_rows[-1]
+            final_status = "stopped" if out.stopped else "done"
+            await _send(ws, TrainingUpdate(
                 run_id=out.run_id or active_run,
-                step=int(row.get("step", i)),
+                step=int(last.get("step", len(metrics_rows) - 1)),
                 metrics={
-                    "train_loss": float(row.get("train_loss", 0.0)),
-                    "val_loss": float(row.get("val_loss", 0.0)),
+                    "train_loss": float(last.get("train_loss", 0.0)),
+                    "val_loss": float(last.get("val_loss", 0.0)),
                 },
-                status="running" if i < len(metrics_rows) - 1 else "done",
+                status=final_status,
             ).model_dump())
+        else:
+            for i, row in enumerate(metrics_rows):
+                await _send(ws, TrainingUpdate(
+                    run_id=out.run_id or active_run,
+                    step=int(row.get("step", i)),
+                    metrics={
+                        "train_loss": float(row.get("train_loss", 0.0)),
+                        "val_loss": float(row.get("val_loss", 0.0)),
+                    },
+                    status="running" if i < len(metrics_rows) - 1 else "done",
+                ).model_dump())
         await _send(ws,Speech(agent="trainer", text=out.speech).model_dump())
         if out.run_id:
             run_registry.set_active(sid, out.run_id)
