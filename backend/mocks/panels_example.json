@@ -1,0 +1,14 @@
+{
+  "type": "panels",
+  "panels": [
+    {
+      "id": "price_hist",
+      "kind": "histogram",
+      "title": "Price",
+      "column": "price",
+      "image_b64": "<base64-png>",
+      "position_hint": "left",
+      "flags": ["right_skewed", "outliers"]
+    }
+  ]
+}

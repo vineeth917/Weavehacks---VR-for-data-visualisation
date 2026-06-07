@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>HoloLab dev UI</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#1a1d24; --border:#262b36; --text:#e7eaf2; --muted:#8a93a6;
+    --accent:#6fb1ff; --good:#7fe3a6; --warn:#f0c674; --bad:#ff8585;
+    --speech:#1e2a3b; --status:#241f33; --train:#2a221c; --highlight:#2a1f1f;
+    --custom:#1d2a25; --handoff:#2a262c; --useraction:#2c2b1a; --thinking:#19232b;
+  }
+  *{box-sizing:border-box; font-family:ui-monospace,Menlo,Consolas,monospace;}
+  body{margin:0; background:var(--bg); color:var(--text); font-size:13px;}
+  header{padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--border);
+    display:flex; gap:14px; align-items:center; flex-wrap:wrap;}
+  header h1{font-size:14px; margin:0; color:var(--accent); font-weight:600;}
+  header .meta{color:var(--muted); font-size:11px;}
+  .dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px;}
+  .dot.ok{background:var(--good);} .dot.bad{background:var(--bad);} .dot.warn{background:var(--warn);}
+
+  main{display:grid; grid-template-columns: 360px 1fr 1fr; gap:0;
+    height: calc(100vh - 48px);}
+  section{border-right:1px solid var(--border); overflow:auto; padding:10px 12px;}
+  section:last-child{border-right:0;}
+  section h2{font-size:11px; color:var(--muted); margin:8px 0 6px;
+    text-transform:uppercase; letter-spacing:1px;}
+
+  /* controls */
+  .ctrl{display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;}
+  textarea, input[type=text]{width:100%; background:#10131a; color:var(--text);
+    border:1px solid var(--border); border-radius:4px; padding:7px 9px;
+    font-family:inherit; font-size:13px; resize:vertical;}
+  textarea{min-height:54px;}
+  button{background:#252a36; color:var(--text); border:1px solid var(--border);
+    border-radius:4px; padding:6px 10px; cursor:pointer; font-family:inherit;
+    font-size:12px;}
+  button:hover{background:#2f3543; border-color:#3a4253;}
+  button.primary{background:#1e3a5a; border-color:#2b5184; color:#cfe2ff;}
+  button.primary:hover{background:#264a73;}
+  button.warn{background:#3a2a1e; border-color:#5a4232; color:#ffd8b8;}
+  .row{display:flex; gap:4px; margin-bottom:6px; flex-wrap:wrap; align-items:center;}
+  .row label{color:var(--muted); font-size:11px; margin-right:4px;}
+
+  /* event lists */
+  .ev{padding:7px 9px; margin-bottom:6px; border-radius:4px;
+    border-left:3px solid var(--border); background:#171a22; font-size:12px;}
+  .ev .head{display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:3px;}
+  .ev .tag{font-weight:600; color:var(--accent);}
+  .ev .ts{color:var(--muted); font-size:10px;}
+  .ev .body{color:var(--text); white-space:pre-wrap; word-break:break-word;}
+  .ev.speech{background:var(--speech); border-color:var(--accent);}
+  .ev.speech .body{font-size:14px;}
+  .ev.agent_status{background:var(--status);}
+  .ev.training_update{background:var(--train); border-color:var(--warn);}
+  .ev.training_update .body{color:#ffe1b8;}
+  .ev.highlight{background:var(--highlight); border-color:var(--bad);}
+  .ev.panels{background:#172025; border-color:var(--good);}
+  .ev.error{background:#2a1818; border-color:var(--bad); color:#ffb6b6;}
+
+  .ev.custom{background:var(--custom); border-color:var(--good);}
+  .ev.handoff{background:var(--handoff); border-color:#b890c4;}
+  .ev.user_action{background:var(--useraction); border-color:var(--warn);}
+  .ev.agent_thinking{background:var(--thinking); border-color:#7eb0d8;}
+
+  details{margin-top:4px;}
+  details summary{cursor:pointer; color:var(--muted); font-size:11px;}
+  pre{margin:4px 0 0; padding:6px 8px; background:#0c0f15; border-radius:3px;
+    overflow:auto; max-height:240px; font-size:11px; color:#d0d4dd;}
+
+  .panel-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px;}
+  .panel-card{background:#0c0f15; border:1px solid var(--border); border-radius:4px;
+    padding:6px; transition:border-color 0.1s, transform 0.05s;}
+  .panel-card.clickable{cursor:pointer;}
+  .panel-card.clickable:hover{border-color:var(--accent); transform:translateY(-1px);}
+  .panel-card.clickable:active{transform:translateY(0);}
+  .panel-card img{width:100%; height:auto; display:block; background:#fff;
+    border-radius:2px; pointer-events:none;}
+  .panel-card .meta{margin-top:4px; font-size:10px; color:var(--muted);}
+  .panel-card .flags{margin-top:2px;}
+  .flag{display:inline-block; background:#252a36; color:#cfe2ff; padding:1px 5px;
+    border-radius:8px; font-size:10px; margin-right:3px;}
+
+  .btn-bar{display:flex; gap:4px; flex-wrap:wrap;}
+  .clear-btn{background:transparent; border:none; color:var(--muted); cursor:pointer;
+    font-size:10px; text-decoration:underline;}
+</style>
+</head>
+<body>
+<header>
+  <h1>HoloLab dev UI</h1>
+  <span class="meta">sid <code id="sidLabel">…</code></span>
+  <span class="meta"><span class="dot bad" id="wsDot"></span>/ws <span id="wsState">…</span></span>
+  <span class="meta"><span class="dot bad" id="sseDot"></span>/agui <span id="sseState">…</span></span>
+  <span class="meta">contracts <code id="contractsV">…</code></span>
+  <span style="flex:1"></span>
+  <span class="meta">throwaway — backend/scripts/test_ui/index.html</span>
+</header>
+
+<main>
+
+<section>
+  <h2>controls</h2>
+
+  <h2 style="margin-top:0">voice_query</h2>
+  <textarea id="vqText" placeholder="e.g. which columns are skewed and is anything missing?">which columns are skewed and is anything missing?</textarea>
+  <div class="ctrl">
+    <button class="primary" onclick="sendVoiceQuery()">send voice_query</button>
+    <button id="micBtn" onclick="toggleRecord()">🎙 hold to talk</button>
+  </div>
+  <div id="micStatus" style="color:var(--muted); font-size:11px; min-height:14px"></div>
+
+  <h2>command: load_dataset</h2>
+  <div class="btn-bar">
+    <button onclick="loadDataset('titanic')">load titanic</button>
+    <button onclick="loadDataset('sample')">load sample.csv</button>
+  </div>
+
+  <h2>voice_query: problem type</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="askProblemType()">what problem?</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Loads nothing extra — run <b>load titanic</b> first. Routes to
+    <code>problem_type</code> and returns a <code>speech</code> frame.
+  </div>
+
+  <h2>voice_query: preprocessor</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="cleanData()">clean data</button>
+    <button onclick="readyToTrain()">ready to train?</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Requires <code>ENABLE_PREPROCESSOR=1</code> on the server. Run
+    <b>load sample</b> first. Returns <code>speech</code> + updated
+    <code>panels</code> on the versioned copy (v0 preserved).
+  </div>
+
+  <h2>voice_query: trainer</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="trainModel()">train model</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Requires <code>ENABLE_TRAINER=1</code> and cleaned data. Streams real per-epoch
+    <code>training_update</code> frames (train/val loss) then speech.
+  </div>
+
+  <h2>voice_query: evals</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="runEvals()">run evals</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Requires <code>ENABLE_EVALS=1</code> and cleaned data (<b>load sample</b> +
+    <b>clean data</b> first). Returns <code>speech</code> + confusion-matrix
+    <code>panels</code> from a real sklearn test split.
+  </div>
+
+  <h2>command: load_run</h2>
+  <div class="btn-bar">
+    <button onclick="loadRun('demo-overfit-001')">overfit</button>
+    <button onclick="loadRun('demo-healthy-002')">healthy</button>
+    <button onclick="loadRun('demo-leakage-003')">leakage</button>
+  </div>
+
+  <h2>command: narrate</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="narrateSession()">📝 narrate session</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Reads accumulated EDA findings + active-run verdict from Redis, no
+    recomputation. Returns a <code>report</code> frame rendered below.
+  </div>
+
+  <h2>command: reset</h2>
+  <div class="btn-bar">
+    <button class="warn" onclick="resetSession()">reset session</button>
+  </div>
+
+  <h2>fake interaction</h2>
+  <div class="row">
+    <label>point_ids (comma)</label>
+    <input id="ptIds" type="text" value="r10, r25, r80" />
+  </div>
+  <div class="btn-bar">
+    <button onclick="sendInteraction('select_point')">select_point</button>
+    <button onclick="sendInteraction('grab_region')">grab_region</button>
+  </div>
+  <div style="margin-top:6px; color:var(--muted); font-size:11px">
+    <b>Grab a column:</b> click any rendered panel image →
+    <code>select_panel</code> with that column.
+  </div>
+  <div class="ctrl" style="margin-top:6px">
+    <label style="color:var(--muted); font-size:11px">A2UI button replays</label>
+  </div>
+  <div class="btn-bar">
+    <button onclick="sendAction('confirm_transform', {column:'fare', transform:'log'})">confirm_transform</button>
+    <button onclick="sendAction('dismiss', {column:'fare'})">dismiss</button>
+    <button onclick="sendAction('stop_training', {run_id:'demo-overfit-001'})">stop_training</button>
+    <button onclick="sendAction('keep_training', {run_id:'demo-overfit-001'})">keep_training</button>
+  </div>
+
+  <h2 style="margin-top:18px">tips</h2>
+  <div style="color:var(--muted); font-size:11px; line-height:1.5">
+    EDA queries → router picks <code>eda</code><br>
+    "what problem are we solving?" → <code>problem_type</code><br>
+    <code>ENABLE_PREPROCESSOR=1</code>: clean data / ready to train → <code>preprocessor</code><br>
+    "is my model overfitting?" → <code>training_monitor</code><br>
+    Click <b>load_run</b> first if you want a non-default run<br>
+    Click <b>load_dataset</b> if you want sample.csv instead of titanic<br>
+    <b>🎙 mic:</b> click once to start, click again to stop. The recording is
+    posted to <code>/transcribe</code> (Whisper) and the returned text is
+    sent as a voice_query automatically.
+  </div>
+</section>
+
+<section>
+  <h2 style="display:flex; justify-content:space-between; align-items:baseline">
+    <span>/ws frames (backend → client)</span>
+    <button class="clear-btn" onclick="clearList('wsList')">clear</button>
+  </h2>
+  <div id="wsList"></div>
+</section>
+
+<section>
+  <h2 style="display:flex; justify-content:space-between; align-items:baseline">
+    <span>/agui events (dashboard SSE)</span>
+    <button class="clear-btn" onclick="clearList('sseList')">clear</button>
+  </h2>
+  <div id="sseList"></div>
+</section>
+
+</main>
+
+<script>
+const sid = "dev-" + Math.random().toString(36).slice(2, 10);
+document.getElementById("sidLabel").textContent = sid;
+
+const wsUrl   = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
+const sseUrl  = "/agui";
+
+const wsDot = document.getElementById("wsDot");
+const wsState = document.getElementById("wsState");
+const sseDot = document.getElementById("sseDot");
+const sseState = document.getElementById("sseState");
+
+let ws = null;
+let wsReady = false;
+
+function setWsState(label, cls) {
+  wsState.textContent = label;
+  wsDot.className = "dot " + cls;
+}
+function setSseState(label, cls) {
+  sseState.textContent = label;
+  sseDot.className = "dot " + cls;
+}
+
+function ts() {
+  const d = new Date();
+  return d.toLocaleTimeString("en-GB", {hour12:false}) + "." +
+    String(d.getMilliseconds()).padStart(3, "0");
+}
+
+function clearList(id) {
+  document.getElementById(id).innerHTML = "";
+}
+
+function makeEv(parentId, cls, tag, bodyEl) {
+  const wrap = document.createElement("div");
+  wrap.className = "ev " + cls;
+  const head = document.createElement("div");
+  head.className = "head";
+  const tagEl = document.createElement("span"); tagEl.className = "tag"; tagEl.textContent = tag;
+  const tsEl  = document.createElement("span"); tsEl.className = "ts";  tsEl.textContent  = ts();
+  head.appendChild(tagEl); head.appendChild(tsEl);
+  wrap.appendChild(head);
+  if (typeof bodyEl === "string") {
+    const b = document.createElement("div"); b.className = "body"; b.textContent = bodyEl;
+    wrap.appendChild(b);
+  } else if (bodyEl) {
+    wrap.appendChild(bodyEl);
+  }
+  const list = document.getElementById(parentId);
+  list.prepend(wrap);
+  return wrap;
+}
+
+function jsonDetails(label, obj) {
+  const det = document.createElement("details");
+  const sum = document.createElement("summary"); sum.textContent = label;
+  det.appendChild(sum);
+  const pre = document.createElement("pre"); pre.textContent = JSON.stringify(obj, null, 2);
+  det.appendChild(pre);
+  return det;
+}
+
+// ---------- WebSocket ----------
+function connectWs() {
+  setWsState("connecting…", "warn");
+  ws = new WebSocket(wsUrl);
+  ws.onopen = () => {
+    wsReady = true;
+    setWsState("open", "ok");
+    makeEv("wsList", "agent_status", "ws connected", "session_id=" + sid);
+  };
+  ws.onclose = () => {
+    wsReady = false;
+    setWsState("closed (retrying)", "bad");
+    setTimeout(connectWs, 1500);
+  };
+  ws.onerror = () => setWsState("error", "bad");
+  ws.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); }
+    catch (err) { makeEv("wsList", "error", "bad json", e.data); return; }
+    renderWsFrame(msg);
+  };
+}
+
+function send(obj) {
+  if (!wsReady) { alert("ws not connected yet"); return; }
+  obj.session_id = sid;
+  ws.send(JSON.stringify(obj));
+}
+
+function sendVoiceQuery() {
+  const text = document.getElementById("vqText").value.trim();
+  if (!text) return;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query", text);
+}
+
+function askProblemType() {
+  const text = "what problem are we solving?";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (problem_type)", text);
+}
+
+function cleanData() {
+  const text = "remove nulls and duplicates and log-transform the skewed columns";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (preprocessor clean)", text);
+}
+
+function readyToTrain() {
+  const text = "is my data ready to train?";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (preprocessor ready?)", text);
+}
+
+function trainModel() {
+  const text = "train the model";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (trainer)", text);
+}
+
+function runEvals() {
+  const text = "run the evals";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (evals)", text);
+}
+
+function loadDataset(name) {
+  send({type:"command", action:"load_dataset", params:{name}});
+  makeEv("wsList", "agent_status", "→ load_dataset", name);
+}
+
+function loadRun(run_id) {
+  send({type:"command", action:"load_run", params:{run_id}});
+  makeEv("wsList", "agent_status", "→ load_run", run_id);
+}
+
+function resetSession() {
+  send({type:"command", action:"reset"});
+  makeEv("wsList", "agent_status", "→ reset", "");
+}
+
+function narrateSession() {
+  send({type:"command", action:"narrate"});
+  makeEv("wsList", "agent_status", "→ narrate", "wrap-up requested");
+}
+
+function sendInteraction(action) {
+  const ids = document.getElementById("ptIds").value
+    .split(",").map(s => s.trim()).filter(Boolean);
+  send({type:"interaction", action, point_ids: ids});
+  makeEv("wsList", "agent_status", "→ " + action, ids.join(", "));
+}
+
+function sendSelectPanel(column) {
+  send({type:"interaction", action:"select_panel", target_id: column});
+  makeEv("wsList", "agent_status", "→ select_panel", "column=" + column);
+}
+
+function sendAction(action, context) {
+  send({type:"interaction", action, context});
+  makeEv("wsList", "agent_status", "→ " + action, JSON.stringify(context));
+}
+
+// ---------- /ws frame rendering ----------
+function renderWsFrame(msg) {
+  const t = msg.type || "unknown";
+  if (t === "speech") {
+    makeEv("wsList", "speech",
+      "🔊 " + (msg.agent || "agent") + " · speech",
+      msg.text || "");
+  } else if (t === "panels") {
+    const body = document.createElement("div");
+    body.className = "body";
+    body.textContent = (msg.panels || []).length + " panel(s)";
+    const grid = document.createElement("div");
+    grid.className = "panel-grid";
+    (msg.panels || []).forEach(p => {
+      const card = document.createElement("div"); card.className = "panel-card";
+      if (p.column) {
+        card.classList.add("clickable");
+        card.title = "click to ask the agent about column `" + p.column + "`";
+        card.onclick = () => sendSelectPanel(p.column);
+      }
+      if (p.image_b64) {
+        const img = new Image();
+        img.src = "data:image/png;base64," + p.image_b64;
+        card.appendChild(img);
+      }
+      const meta = document.createElement("div"); meta.className = "meta";
+      meta.textContent = (p.kind || "?") + " · " + (p.column || "—") +
+        " · " + (p.title || "");
+      card.appendChild(meta);
+      if (p.flags && p.flags.length) {
+        const flagsEl = document.createElement("div"); flagsEl.className = "flags";
+        p.flags.forEach(f => {
+          const fEl = document.createElement("span"); fEl.className = "flag";
+          fEl.textContent = f;
+          flagsEl.appendChild(fEl);
+        });
+        card.appendChild(flagsEl);
+      }
+      grid.appendChild(card);
+    });
+    body.appendChild(grid);
+    body.appendChild(jsonDetails("raw panels frame", msg));
+    makeEv("wsList", "panels", "🖼 panels (" + (msg.panels || []).length + ")", body);
+  } else if (t === "training_update") {
+    const m = msg.metrics || {};
+    const line = "run=" + msg.run_id + "  step=" + msg.step + "  status=" +
+      (msg.status || "?") + "  " +
+      Object.entries(m).map(([k,v]) => k + "=" + v).join("  ");
+    makeEv("wsList", "training_update", "📈 training_update", line);
+  } else if (t === "highlight") {
+    const body = document.createElement("div"); body.className = "body";
+    body.textContent = "ids: " + (msg.target_ids || []).join(", ") +
+      "\nreason: " + (msg.reason || "");
+    makeEv("wsList", "highlight", "✨ highlight", body);
+  } else if (t === "agent_status") {
+    const tag = msg.agent + " · " + msg.state;
+    makeEv("wsList", "agent_status", tag, msg.message || "");
+  } else if (t === "report") {
+    const body = document.createElement("div"); body.className = "body";
+    body.innerHTML = "<b>" + (msg.verdict || "") + "</b>";
+    const list = document.createElement("ul");
+    (msg.sections || []).forEach(s => {
+      const li = document.createElement("li");
+      li.innerHTML = "<b>" + s.title + "</b>: " + s.body;
+      list.appendChild(li);
+    });
+    body.appendChild(list);
+    body.appendChild(jsonDetails("raw report", msg));
+    makeEv("wsList", "speech", "📝 report", body);
+  } else {
+    const body = document.createElement("div");
+    body.appendChild(jsonDetails("raw", msg));
+    makeEv("wsList", "agent_status", t, body);
+  }
+}
+
+// ---------- EventSource (/agui) ----------
+let es = null;
+let sseRetryTimer = null;
+let sseEverConnected = false;
+
+function connectSse() {
+  if (es) { try { es.close(); } catch (_) {} es = null; }
+  setSseState("connecting…", "warn");
+  es = new EventSource(sseUrl);
+
+  es.onopen = () => {
+    setSseState("open", "ok");
+    if (!sseEverConnected) {
+      sseEverConnected = true;
+      makeEv("sseList", "agent_thinking", "agui connected",
+        "listening — HANDOFF / CUSTOM A2UI / USER_ACTION appear here\n" +
+        "(server replays last ~64 events on connect)");
+    }
+  };
+  es.onerror = () => {
+    setSseState("error (retrying)", "bad");
+    if (sseRetryTimer) return;
+    sseRetryTimer = setTimeout(() => {
+      sseRetryTimer = null;
+      connectSse();
+    }, 2000);
+  };
+
+  // EventSource only routes `event: NAME` lines via addEventListener — register
+  // every AG-UI name plus onmessage as fallback. routeSse() uses data.event
+  // from the JSON body as the source of truth when wire name differs.
+  const EVENT_NAMES = [
+    "STATE_DELTA", "HANDOFF", "USER_ACTION", "CUSTOM", "AGENT_THINKING",
+    "RUN_STARTED", "RUN_FINISHED", "TEXT_MESSAGE_CONTENT",
+    "TOOL_CALL_START", "TOOL_CALL_END",
+  ];
+  const handler = (e) => routeSse(e.type || "message", e);
+  EVENT_NAMES.forEach(name => es.addEventListener(name, handler));
+  es.onmessage = handler;
+}
+
+function _a2uiSurfaceId(v) {
+  const env = v.surfaceUpdate || v.dataModelUpdate || v.beginRendering
+    || v.updateComponents || v.updateDataModel || v.createSurface || {};
+  return env.surfaceId || "?";
+}
+
+function routeSse(wireName, e) {
+  let data;
+  try { data = JSON.parse(e.data); }
+  catch (err) { makeEv("sseList", "error", "bad sse json", e.data); return; }
+
+  // JSON payload is authoritative — fixes CUSTOM-wrapped AGENT_THINKING etc.
+  const eventName = data.event || wireName;
+
+  if (eventName === "STATE_DELTA" && data.args && data.args.contracts_version) {
+    document.getElementById("contractsV").textContent = data.args.contracts_version;
+    return;
+  }
+  if (eventName === "STATE_DELTA") return; // heartbeats — silent
+
+  if (eventName === "HANDOFF") {
+    const a = data.args || {};
+    const body = document.createElement("div"); body.className = "body";
+    body.innerHTML = "<b>" + (a.from || "?") + "</b> → <b>" + (a.to || "?") + "</b>";
+    body.appendChild(jsonDetails("raw HANDOFF", data));
+    makeEv("sseList", "handoff", "↪ HANDOFF", body);
+    return;
+  }
+
+  if (eventName === "USER_ACTION") {
+    const a = data.args || {};
+    const body = document.createElement("div"); body.className = "body";
+    body.textContent = "action=" + (a.action || "?") +
+      "  context=" + JSON.stringify(a.context || {});
+    body.appendChild(jsonDetails("raw USER_ACTION", data));
+    makeEv("sseList", "user_action", "🖱 USER_ACTION", body);
+    return;
+  }
+
+  if (eventName === "AGENT_THINKING") {
+    const a = data.args || {};
+    makeEv("sseList", "agent_thinking", "💭 AGENT_THINKING",
+      "agent=" + (a.agent || data.agent || "?"));
+    return;
+  }
+
+  if (eventName === "CUSTOM") {
+    const name = data.name || "(no name)";
+    const v = data.value || {};
+    const surfaceId = _a2uiSurfaceId(v);
+    const body = document.createElement("div"); body.className = "body";
+    body.textContent = name + "  surfaceId=" + surfaceId;
+    body.appendChild(jsonDetails("A2UI " + name + " (envelope)", v));
+    body.appendChild(jsonDetails("raw CUSTOM", data));
+    makeEv("sseList", "custom", "🪟 CUSTOM · " + name, body);
+    return;
+  }
+
+  // anything else
+  const body = document.createElement("div");
+  body.appendChild(jsonDetails("raw " + eventName, data));
+  makeEv("sseList", "custom", eventName, body);
+}
+
+// ---------- mic / Whisper ----------
+let mediaRecorder = null;
+let recChunks = [];
+let recStream = null;
+
+const micBtn = document.getElementById("micBtn");
+const micStatus = document.getElementById("micStatus");
+
+function micState(label, working) {
+  micStatus.textContent = label;
+  if (working) {
+    micBtn.textContent = "⏹ stop & transcribe";
+    micBtn.classList.add("warn");
+  } else {
+    micBtn.textContent = "🎙 hold to talk";
+    micBtn.classList.remove("warn");
+  }
+}
+
+async function toggleRecord() {
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    micState("getUserMedia not available in this browser", false);
+    return;
+  }
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({audio: true});
+  } catch (err) {
+    micState("mic permission denied: " + err.message, false);
+    return;
+  }
+  // Prefer opus in webm — Whisper handles it cleanly and the file is tiny.
+  let mimeType = "audio/webm;codecs=opus";
+  if (!MediaRecorder.isTypeSupported(mimeType)) {
+    mimeType = "audio/webm";
+    if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = "";
+  }
+  recChunks = [];
+  mediaRecorder = new MediaRecorder(recStream, mimeType ? {mimeType} : undefined);
+  mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+  mediaRecorder.onstop = async () => {
+    recStream.getTracks().forEach((t) => t.stop());
+    recStream = null;
+    const blob = new Blob(recChunks, {type: mediaRecorder.mimeType || "audio/webm"});
+    if (blob.size === 0) {
+      micState("no audio captured", false); return;
+    }
+    micState("transcribing (" + (blob.size/1024).toFixed(1) + " KB)…", true);
+    const fd = new FormData();
+    fd.append("file", blob, "rec.webm");
+    let resp;
+    try {
+      resp = await fetch("/transcribe", {method: "POST", body: fd});
+    } catch (err) {
+      micState("network error: " + err.message, false); return;
+    }
+    if (!resp.ok) {
+      const detail = await resp.text();
+      micState("transcribe failed: HTTP " + resp.status + " " + detail, false);
+      return;
+    }
+    const data = await resp.json();
+    micState("transcribed in " + data.latency_ms + "ms: " + data.text, false);
+    if (data.text && data.text.trim()) {
+      document.getElementById("vqText").value = data.text.trim();
+      sendVoiceQuery();
+    }
+  };
+  mediaRecorder.start();
+  micState("recording… click again to stop", true);
+}
+
+connectWs();
+connectSse();
+</script>
+</body>
+</html>
