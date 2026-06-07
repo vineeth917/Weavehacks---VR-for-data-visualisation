@@ -1,9 +1,15 @@
 # Broadcast — `replay_run_history.json` schema (Person A → Person C)
 
+> **STATUS: FROZEN as of the narrator-phase (TASKS_A complete).**
+> Person C has confirmed her `LossChart` is being updated to read the
+> keyed `{run_id: {config, metrics, summary}}` shape below. **No further
+> changes to this schema without explicit sign-off from both A and C.**
+> Backend will not introduce new top-level keys or rename existing ones;
+> if new per-metric fields appear they must be additive and optional.
+
 Person A (backend) shipping the training-monitor phase. Locking the
 replay-run-history schema now so the dashboard's training-curve panel can
-consume it directly. **Please sign off on the schema below — speak up if you
-need a field added.** Schema lives at `data/replay_run_history.json`.
+consume it directly. Schema lives at `data/replay_run_history.json`.
 
 ## Top-level shape
 

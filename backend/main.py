@@ -21,8 +21,12 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import io
+from pathlib import Path
+
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import TypeAdapter, ValidationError
 from sse_starlette.sse import EventSourceResponse
 
@@ -32,6 +36,7 @@ from backend.a2ui import emitter as a2ui_emitter
 from backend.a2ui import surfaces as a2ui_surfaces
 from backend.agents import dataset_registry
 from backend.agents import eda as eda_agent
+from backend.agents import narrator as narrator_agent
 from backend.agents import router as router_agent
 from backend.agents import run_registry
 from backend.agents.context import OrchestratorContext
@@ -45,6 +50,8 @@ from backend.contracts import (
     Interaction,
     Panel,
     Panels,
+    Report,
+    ReportSection,
     Speech,
     TrainingUpdate,
     UserAction,
@@ -116,6 +123,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------------------------
+# /dev-ui — throwaway local test UI (backend/scripts/test_ui/index.html)
+# Same origin so no CORS or proxy required. Safe to ship; pure static HTML.
+# ---------------------------------------------------------------------------
+_DEV_UI_DIR = Path(__file__).resolve().parent / "scripts" / "test_ui"
+if _DEV_UI_DIR.exists():
+    app.mount("/dev-ui", StaticFiles(directory=str(_DEV_UI_DIR), html=True),
+              name="dev-ui")
+    log.info("dev UI mounted at /dev-ui (from %s)", _DEV_UI_DIR)
+
 
 # ---------------------------------------------------------------------------
 # /healthz
@@ -139,6 +156,112 @@ async def healthz() -> dict[str, Any]:
         "contracts_version": CONTRACTS_VERSION,
         "a2ui_actions": sorted(A2UI_ACTIONS),
     }
+
+
+# ---------------------------------------------------------------------------
+# /transcribe  —  audio -> text via OpenAI Whisper
+#
+# Accepts any audio container Whisper supports (webm/opus, wav, mp3, m4a, ogg).
+# Returns {"text": str, "model": str, "latency_ms": int}. Up to 25 MB per
+# request — that's Whisper's hard limit, not ours.
+#
+# The dev UI uses this for the "hold-to-talk" button; Person B's WebXR client
+# will use the same endpoint from the headset (record a Blob → POST here →
+# send the returned text back over /ws as a normal voice_query).
+# ---------------------------------------------------------------------------
+
+_WHISPER_MODEL = "whisper-1"
+_WHISPER_MAX_BYTES = 25 * 1024 * 1024
+
+
+# ---------------------------------------------------------------------------
+# /action  —  A2UI v0.9 client → server action receiver
+#
+# v0.9 dispatch shape (per https://a2ui.org/concepts/actions/):
+#   {"version":"v0.9","action":{"name":"confirm_transform",
+#                               "surfaceId":"eda-action",
+#                               "sourceComponentId":"confirm",
+#                               "timestamp":"2026-...",
+#                               "context":{"column":"fare","transform":"log"}}}
+#
+# We also accept the v0.8 mirror `{"userAction":{...}}` for the same body,
+# and a "flat" shape `{"action":"...","context":{...},"surface_id":"..."}`
+# the VR client / dashboard JS may use directly. Person C's renderer can
+# point at this endpoint regardless of which BUTTON_MODE we chose.
+#
+# Requires `session_id` either in the JSON body or as ?session_id= query.
+# Returns the resolved Interaction for round-trip debugging.
+# ---------------------------------------------------------------------------
+
+@app.post("/action")
+async def action_post(payload: dict[str, Any]) -> dict[str, Any]:
+    sid = payload.get("session_id")
+    body = payload.get("action") or payload.get("userAction") or payload
+    if isinstance(body, dict):
+        name = body.get("name") or body.get("action")
+        surface_id = body.get("surfaceId") or body.get("surface_id") \
+                      or body.get("sourceComponentId")
+        context = body.get("context") or {}
+        sid = sid or body.get("session_id")
+    else:
+        raise HTTPException(status_code=400, detail="action body must be an object")
+    if not sid:
+        raise HTTPException(status_code=400, detail="missing session_id")
+    if not name:
+        raise HTTPException(status_code=400, detail="missing action name")
+
+    iact = Interaction(
+        session_id=str(sid), action=str(name),
+        target_id=(str(surface_id) if surface_id else None),
+        context=(context if isinstance(context, dict) else {}),
+    )
+    # Emit a USER_ACTION on /agui so the dashboard / debugger sees the click
+    # without us needing a websocket round-trip.
+    a2ui_emitter.emit_agui(
+        "USER_ACTION",
+        {"action": iact.action, "context": iact.context,
+         "target_id": iact.target_id, "session_id": sid, "via": "POST /action"},
+        agent="router",
+    )
+    redis_state.push_memory(sid, {"role": "action", "action": iact.action,
+                                   "context": iact.context, "via": "POST",
+                                   "ts": time.time()})
+    return {"ok": True, "interaction": iact.model_dump()}
+
+
+@app.post("/transcribe")
+async def transcribe(file: UploadFile = File(...)) -> dict[str, Any]:
+    if not config.OPENAI_API_KEY:
+        raise HTTPException(status_code=503,
+                            detail="OPENAI_API_KEY not set on the backend")
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="empty audio body")
+    if len(audio_bytes) > _WHISPER_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"audio too large ({len(audio_bytes)} bytes; max 25 MB)",
+        )
+
+    # OpenAI SDK is sync — run in a thread so we don't block the event loop.
+    def _do_stt() -> tuple[str, float]:
+        from openai import OpenAI
+        client = OpenAI(api_key=config.OPENAI_API_KEY)
+        bio = io.BytesIO(audio_bytes)
+        bio.name = file.filename or "audio.webm"
+        t0 = time.time()
+        tr = client.audio.transcriptions.create(model=_WHISPER_MODEL, file=bio)
+        return tr.text, (time.time() - t0)
+
+    try:
+        text, dt = await asyncio.to_thread(_do_stt)
+    except Exception as e:  # noqa: BLE001
+        log.exception("whisper failed")
+        raise HTTPException(status_code=502, detail=f"whisper: {e}") from e
+
+    log.info("transcribe bytes=%d text_len=%d latency_ms=%d",
+             len(audio_bytes), len(text), int(dt * 1000))
+    return {"text": text, "model": _WHISPER_MODEL, "latency_ms": int(dt * 1000)}
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +400,36 @@ async def _handle_interaction(ws: WebSocket, msg: Interaction) -> None:
     )
 
 
+async def _send_narrator_report(ws: WebSocket, out, sid: str) -> None:
+    """Send a Report frame on /ws + cache the narrative in Redis scratch.
+
+    `out` is a NarratorOutput (Pydantic). We don't emit a dedicated A2UI
+    surface here — the Report frame itself is the deliverable, and the dev UI
+    already renders it inline. Dashboard can subscribe to /ws or render via
+    Person C's preferred path later.
+    """
+    sections = [
+        ReportSection(title=str(s.title), body=str(s.body))
+        for s in (out.sections or [])
+    ]
+    report = Report(
+        speak=True,
+        verdict=str(out.verdict or "mixed"),
+        sections=sections,
+    )
+    await ws.send_json(report.model_dump())
+    # Mirror the spoken summary as a Speech frame so STT-driven flows feel natural.
+    if out.speech:
+        await ws.send_json(Speech(agent="narrator", text=out.speech).model_dump())
+    # Cache the latest narrative under scratch so the dashboard can refetch.
+    redis_state.set_scratch(sid, "narrator_last", {
+        "speech": out.speech,
+        "verdict": out.verdict,
+        "sections": [s.model_dump() for s in sections],
+        "ts": time.time(),
+    })
+
+
 def _emit_training_verdict_surface(out, sid: str) -> None:
     """Build + emit the training-verdict A2UI surface from a TrainingMonitorOutput."""
     reason = " ".join(out.rationale[:3]) if out.rationale else out.speech
@@ -332,6 +485,18 @@ async def _handle_voice_query(ws: WebSocket, msg: VoiceQuery) -> None:
         )
         return
 
+    # ---- specialist: narrator ----
+    if result.target == "narrator" and result.narrator is not None:
+        out = result.narrator
+        await _send_narrator_report(ws, out, sid)
+        log.info("voice_query sid=%s -> narrator verdict=%s sections=%d",
+                 sid, out.verdict, len(out.sections))
+        await ws.send_json(
+            AgentStatus(agent="narrator", state="done",
+                        message=f"verdict={out.verdict} sections={len(out.sections)}").model_dump()
+        )
+        return
+
     # ---- specialist: training_monitor ----
     if result.target == "training_monitor" and result.training is not None:
         out = result.training
@@ -376,6 +541,27 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
         await ws.send_json(
             AgentStatus(agent="router", state="done",
                         message=f"dataset loaded: {name} shape={df.shape}").model_dump()
+        )
+        return
+
+    if msg.action == "narrate":
+        await ws.send_json(
+            AgentStatus(agent="narrator", state="thinking",
+                        message="rolling up session state").model_dump()
+        )
+        try:
+            out = await narrator_agent.run_narrator(sid, text=(msg.params or {}).get("text"))
+        except Exception as e:  # noqa: BLE001
+            log.exception("narrator failed")
+            await ws.send_json(
+                AgentStatus(agent="narrator", state="error",
+                            message=f"narrator: {e}").model_dump()
+            )
+            return
+        await _send_narrator_report(ws, out, sid)
+        await ws.send_json(
+            AgentStatus(agent="narrator", state="done",
+                        message=f"verdict={out.verdict} sections={len(out.sections)}").model_dump()
         )
         return
 

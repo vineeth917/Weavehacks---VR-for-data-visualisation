@@ -26,10 +26,12 @@ from openai import AsyncOpenAI
 from backend import config
 from backend.a2ui import emitter as a2ui_emitter
 from backend.agents import eda as eda_agent_mod
+from backend.agents import narrator as narrator_agent_mod
 from backend.agents import training_monitor as tm_agent_mod
 from backend.agents.context import OrchestratorContext
 from backend.agents.parse import parse_json_object
 from backend.agents.eda import EDAOutput, _parse_eda_output  # noqa: F401
+from backend.agents.narrator import NarratorOutput, _parse_output as _parse_narr
 from backend.agents.training_monitor import TrainingMonitorOutput, _parse_output as _parse_tm
 
 log = logging.getLogger("hololab.agents.router")
@@ -106,8 +108,13 @@ Specialists:
   training_monitor   Training runs: loss curves, val vs train, overfitting,
                      early stopping, leakage, suggested next epoch, learning
                      rate, optimizer, the model's behaviour during training.
+  narrator           Session wrap-up / recap / summary: any utterance asking
+                     "what did we find", "summarise", "wrap up", "give me a
+                     report", "tell me the story so far".
 
 Decision rules:
+  - Words like "summary", "summarise", "wrap", "recap", "report", "story",
+    "what did we", "tell me everything", "overview" → narrator.
   - Words like "column", "missing", "outliers", "skewed", "rows", "dataset",
     "feature", "distribution" → eda.
   - Words like "training", "loss", "val", "validation", "accuracy",
@@ -129,6 +136,7 @@ def _make_router(model: OpenAIChatCompletionsModel) -> Agent[OrchestratorContext
         handoffs=[
             handoff(agent=eda_agent_mod.get_agent()),
             handoff(agent=tm_agent_mod.get_agent()),
+            handoff(agent=narrator_agent_mod.get_agent()),
         ],
     )
 
@@ -156,6 +164,7 @@ def get_router_fallback() -> Agent[OrchestratorContext]:
             handoffs=[
                 handoff(agent=eda_agent_mod.get_fallback_agent()),
                 handoff(agent=tm_agent_mod.get_fallback_agent()),
+                handoff(agent=narrator_agent_mod.get_fallback_agent()),
             ],
         )
         _router_fb = fb
@@ -171,10 +180,12 @@ class RouterResult:
 
     def __init__(self, *, target: str,
                  eda: EDAOutput | None = None,
-                 training: TrainingMonitorOutput | None = None) -> None:
-        self.target = target            # "eda" | "training_monitor" | "unknown"
+                 training: TrainingMonitorOutput | None = None,
+                 narrator: NarratorOutput | None = None) -> None:
+        self.target = target            # "eda" | "training_monitor" | "narrator" | "unknown"
         self.eda = eda
         self.training = training
+        self.narrator = narrator
 
 
 @weave.op()
@@ -202,20 +213,27 @@ async def route(sid: str, text: str, ctx: OrchestratorContext) -> RouterResult:
         return RouterResult(target=target, training=_parse_tm(raw, ctx))
     elif target == "eda":
         return RouterResult(target=target, eda=_parse_eda_output(raw))
+    elif target == "narrator":
+        return RouterResult(target=target, narrator=_parse_narr(raw))
     else:
-        # Fallback: try both parsers
+        # Fallback: try all parsers — caller picks what's non-empty.
         return RouterResult(target="unknown",
                             eda=_parse_eda_output(raw),
-                            training=_parse_tm(raw, ctx))
+                            training=_parse_tm(raw, ctx),
+                            narrator=_parse_narr(raw))
 
 
 def _infer_target(text: str) -> str:
     """Cheap keyword-based fallback when no handoff was observed."""
     t = text.lower()
+    narr_kw = ("summar", "wrap", "recap", "report", "story so far",
+               "what did we", "overview", "tell me everything")
     train_kw = ("overfit", "loss", "val ", "training", "train_", "accuracy",
                 "epoch", "step", "leak", "run", "early stop")
     eda_kw = ("column", "missing", "outlier", "skew", "row", "dataset",
               "feature", "distribution")
+    if any(k in t for k in narr_kw):
+        return "narrator"
     if any(k in t for k in train_kw):
         return "training_monitor"
     if any(k in t for k in eda_kw):
