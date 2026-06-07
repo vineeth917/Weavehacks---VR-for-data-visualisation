@@ -296,6 +296,7 @@ async def _dispatch_keyword_fallback(sid: str, text: str,
     if target == "trainer" and config.ENABLE_TRAINER:
         out = await trainer_agent_mod.run_for_query(
             sid, text, ctx.df, ctx.dataset_name,
+            on_epoch=ctx.on_training_epoch,
         )
         return RouterResult(target="trainer", trainer=out)
     return RouterResult(target="unknown")
@@ -342,7 +343,10 @@ async def route(sid: str, text: str, ctx: OrchestratorContext) -> RouterResult:
         out = await evals_agent_mod.run_for_query(sid, text, ctx.df, ctx.dataset_name)
         return RouterResult(target="evals", evals=out)
     elif target == "trainer" and config.ENABLE_TRAINER:
-        out = await trainer_agent_mod.run_for_query(sid, text, ctx.df, ctx.dataset_name)
+        out = await trainer_agent_mod.run_for_query(
+            sid, text, ctx.df, ctx.dataset_name,
+            on_epoch=ctx.on_training_epoch,
+        )
         return RouterResult(target="trainer", trainer=out)
     else:
         # Fallback: try all parsers — caller picks what's non-empty.

@@ -6,6 +6,7 @@ available; streams per-epoch train/val loss for training_update frames.
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import uuid
 from typing import Any, Awaitable, Callable, Literal
@@ -49,6 +50,19 @@ _SGD_KW = dict(
 )
 
 EpochCallback = Callable[[dict[str, Any]], Awaitable[None] | None]
+EpochHook = Callable[[dict[str, Any]], None] | None
+
+# Set by POST /agui/action (stop_training); checked each epoch in op_run_training.
+# threading.Event because training runs inside asyncio.to_thread().
+training_stop_event = threading.Event()
+
+
+def request_training_stop() -> None:
+    training_stop_event.set()
+
+
+def clear_training_stop() -> None:
+    training_stop_event.clear()
 
 
 def _infer_problem_type(series: pd.Series, n_rows: int) -> ProblemType:
@@ -171,8 +185,16 @@ def _wandb_log_run(
 
 
 @weave.op()
-def op_run_training(sid: str, dataset_name: str, df: pd.DataFrame | None) -> dict[str, Any]:
+def op_run_training(
+    sid: str,
+    dataset_name: str,
+    df: pd.DataFrame | None,
+    *,
+    epoch_hook: EpochHook = None,
+) -> dict[str, Any]:
     """Iterative partial_fit training; returns per-epoch metrics + run metadata."""
+    stopped = False
+    live_run_id = f"hololab-live-{sid[:8]}-{uuid.uuid4().hex[:8]}"
     version = 0
     if config.ENABLE_PREPROCESSOR:
         w = get_working(sid)
@@ -228,48 +250,68 @@ def op_run_training(sid: str, dataset_name: str, df: pd.DataFrame | None) -> dic
         classes = np.unique(y_train_enc)
         clf = SGDClassifier(loss="log_loss", **_SGD_KW)
         for epoch in range(N_EPOCHS):
+            if training_stop_event.is_set():
+                log.info("[training] Stop requested by spectator — halting at epoch %d.", epoch)
+                training_stop_event.clear()
+                stopped = True
+                break
             clf.partial_fit(X_train_arr, y_train_enc, classes=classes)
             train_proba = clf.predict_proba(X_train_arr)
             val_proba = clf.predict_proba(X_test_arr)
             # sklearn.metrics.log_loss: mean negative log-likelihood per sample (normalize=True default)
             train_loss = float(log_loss(y_train_enc, train_proba, labels=classes))
             val_loss = float(log_loss(y_test_enc, val_proba, labels=classes))
-            metrics.append({
+            row = {
                 "step": epoch,
                 "epoch": epoch,
                 "train_loss": round(train_loss, 4),
                 "val_loss": round(val_loss, 4),
-            })
+            }
+            metrics.append(row)
+            if epoch_hook is not None:
+                epoch_hook({**row, "run_id": live_run_id})
     else:
         model_name = "SGD regression"
         reg = SGDRegressor(**_SGD_KW)
         y_train_arr = np.asarray(y_train, dtype=float)
         y_test_arr = np.asarray(y_test, dtype=float)
         for epoch in range(N_EPOCHS):
+            if training_stop_event.is_set():
+                log.info("[training] Stop requested by spectator — halting at epoch %d.", epoch)
+                training_stop_event.clear()
+                stopped = True
+                break
             reg.partial_fit(X_train_arr, y_train_arr)
             train_pred = reg.predict(X_train_arr)
             val_pred = reg.predict(X_test_arr)
             train_loss = float(mean_squared_error(y_train_arr, train_pred))
             val_loss = float(mean_squared_error(y_test_arr, val_pred))
-            metrics.append({
+            row = {
                 "step": epoch,
                 "epoch": epoch,
                 "train_loss": round(train_loss, 4),
                 "val_loss": round(val_loss, 4),
-            })
+            }
+            metrics.append(row)
+            if epoch_hook is not None:
+                epoch_hook({**row, "run_id": live_run_id})
+
+    if not metrics:
+        return {"error": "training produced no epochs", "version": version, "stopped": stopped}
 
     summary = _summarize(metrics)
     final_train = float(summary.get("final_train_loss") or metrics[-1]["train_loss"])
     final_val = float(summary.get("final_val_loss") or metrics[-1]["val_loss"])
     trend = _trend_label(metrics)
 
+    n_epochs = len(metrics)
     run_config = {
         "model": model_name,
         "dataset": dataset_name,
         "target": target_col,
         "problem_type": problem_type,
         "version": version,
-        "epochs": N_EPOCHS,
+        "epochs": n_epochs,
         "lr": "invscaling",
         "eta0": 0.001,
         "power_t": 0.25,
@@ -289,10 +331,11 @@ def op_run_training(sid: str, dataset_name: str, df: pd.DataFrame | None) -> dic
         "version": version,
         "dataset_name": dataset_name,
         "model_name": model_name,
-        "n_epochs": N_EPOCHS,
+        "n_epochs": n_epochs,
         "final_train_loss": final_train,
         "final_val_loss": final_val,
         "trend": trend,
+        "stopped": stopped,
         "trained_at": time.time(),
     }
 
@@ -307,12 +350,13 @@ def op_run_training(sid: str, dataset_name: str, df: pd.DataFrame | None) -> dic
         "target_column": target_col,
         "version": version,
         "model_name": model_name,
-        "n_epochs": N_EPOCHS,
+        "n_epochs": n_epochs,
         "final_train_loss": final_train,
         "final_val_loss": final_val,
         "trend": trend,
         "metrics": metrics,
         "history": history,
+        "stopped": stopped,
     }
 
 
@@ -329,6 +373,7 @@ class TrainerOutput(BaseModel):
     trend: str = ""
     metrics: list[dict[str, Any]] = Field(default_factory=list)
     wandb_url: str | None = None
+    stopped: bool = False
 
 
 _EMPTY = TrainerOutput(speech="I couldn't train — load a dataset and try again.")
@@ -408,15 +453,23 @@ def _output_from_result(result: dict[str, Any]) -> TrainerOutput:
             version=int(result.get("version") or 0),
             target_column=result.get("target_column"),
         )
+    stopped = bool(result.get("stopped"))
+    speech = _speech_from_run(
+        str(result.get("problem_type") or "unknown"),
+        str(result.get("model_name") or "SGD model"),
+        int(result.get("n_epochs") or N_EPOCHS),
+        float(result.get("final_train_loss") or 0.0),
+        float(result.get("final_val_loss") or 0.0),
+        str(result.get("trend") or "converging"),
+    )
+    if stopped:
+        speech = (
+            f"Training stopped early after {int(result.get('n_epochs') or 0)} epochs — "
+            f"train loss {float(result.get('final_train_loss') or 0.0):.2f}, "
+            f"val loss {float(result.get('final_val_loss') or 0.0):.2f}"
+        )
     return TrainerOutput(
-        speech=_speech_from_run(
-            str(result.get("problem_type") or "unknown"),
-            str(result.get("model_name") or "SGD model"),
-            int(result.get("n_epochs") or N_EPOCHS),
-            float(result.get("final_train_loss") or 0.0),
-            float(result.get("final_val_loss") or 0.0),
-            str(result.get("trend") or "converging"),
-        ),
+        speech=speech,
         run_id=str(result.get("run_id") or ""),
         problem_type=result.get("problem_type") or "unknown",
         target_column=result.get("target_column"),
@@ -428,6 +481,7 @@ def _output_from_result(result: dict[str, Any]) -> TrainerOutput:
         trend=str(result.get("trend") or ""),
         metrics=list(result.get("metrics") or []),
         wandb_url=result.get("wandb_url"),
+        stopped=stopped,
     )
 
 
@@ -456,13 +510,31 @@ async def run_for_query(
     """Deterministic training path with optional per-epoch callback."""
     import asyncio
 
+    clear_training_stop()
+    loop = asyncio.get_running_loop()
+
+    def epoch_hook(row: dict[str, Any]) -> None:
+        if on_epoch is None:
+            return
+        run_id = str(row.get("run_id") or "")
+        fut = asyncio.run_coroutine_threadsafe(
+            _emit_epoch(on_epoch, row, run_id), loop,
+        )
+        try:
+            fut.result(timeout=5.0)
+        except Exception as e:  # noqa: BLE001
+            log.warning("epoch_hook await failed: %s", e)
+
     try:
-        result = await asyncio.to_thread(op_run_training, sid, dataset_name, df)
+        result = await asyncio.to_thread(
+            op_run_training, sid, dataset_name, df, epoch_hook=epoch_hook,
+        )
         if result.get("error"):
             return _output_from_result(result)
-        run_id = str(result.get("run_id") or "")
-        for row in result.get("metrics") or []:
-            await _emit_epoch(on_epoch, row, run_id)
+        if on_epoch is None:
+            run_id = str(result.get("run_id") or "")
+            for row in result.get("metrics") or []:
+                await _emit_epoch(on_epoch, row, run_id)
         return _output_from_result(result)
     except Exception as e:  # noqa: BLE001
         log.warning("trainer run failed: %s", e)
