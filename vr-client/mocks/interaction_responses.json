@@ -1,0 +1,14 @@
+{
+  "select_point": [
+    { "type": "speech", "text": "That point sits in the upper cluster along PC1." },
+    { "type": "highlight", "target_ids": ["{target_id}", "price_hist"] }
+  ],
+  "grab_region": [
+    { "type": "speech", "text": "You grabbed a dense region with {count} nearby points." },
+    { "type": "highlight", "target_ids": "{point_ids}" }
+  ],
+  "select_panel": [
+    { "type": "speech", "text": "This panel summarizes the {target_id} column." },
+    { "type": "highlight", "target_ids": ["{target_id}"] }
+  ]
+}
