@@ -27,7 +27,6 @@ export interface AguiEvent {
   args?: Record<string, unknown>;
   result?: string;
   message?: string;
-  // pipeline-specific fields (mirrored from /ws via _send)
   text?: string;
   state?: string;
   sections?: { heading?: string; body?: string }[];
@@ -60,13 +59,16 @@ export function useAguiStream(backendUrl: string) {
   const esRef = useRef<EventSource | null>(null);
   const mockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mockFedRef = useRef(false);
+  // track whether we ever got a real backend message — if so, never fall back to mocks
+  const everConnectedRef = useRef(false);
 
   const pushEvent = useCallback((ev: AguiEvent) => {
     setEvents((prev) => [...prev, ev]);
   }, []);
 
   const startMockStream = useCallback(async () => {
-    if (mockFedRef.current) return;
+    // Never load mocks if we already got real backend data
+    if (mockFedRef.current || everConnectedRef.current) return;
     mockFedRef.current = true;
     setStatus("mock");
     try {
@@ -86,6 +88,7 @@ export function useAguiStream(backendUrl: string) {
     setEvents([]);
     eventCounter = 0;
     mockFedRef.current = false;
+    everConnectedRef.current = false;
     startMockStream();
   }, [startMockStream]);
 
@@ -94,32 +97,28 @@ export function useAguiStream(backendUrl: string) {
     const es = new EventSource(url);
     esRef.current = es;
 
+    // Fall back to mocks only if no connection within 5s
     const timeout = setTimeout(() => {
-      if (status === "connecting") {
-        es.close();
+      if (!everConnectedRef.current) {
         startMockStream();
       }
-    }, 3000);
+    }, 5000);
 
     es.onopen = () => {
       clearTimeout(timeout);
+      everConnectedRef.current = true;
       setStatus("connected");
     };
 
-    // Also mark connected on first message in case onopen fires late
-    let markedConnected = false;
-
     es.onmessage = (e) => {
-      if (!markedConnected) {
-        markedConnected = true;
+      // Any message = definitely connected — cancel mock fallback
+      if (!everConnectedRef.current) {
+        everConnectedRef.current = true;
         clearTimeout(timeout);
         setStatus("connected");
       }
       try {
         const raw = JSON.parse(e.data);
-        // Backend sends {event, agent, tool, args, result, ts (unix secs)}
-        // Normalize to our internal shape {type, agent, tool, args, result, message, ts (ms)}
-        // CUSTOM events carry mirrored /ws pipeline frames in raw.value
         const isCustom = (raw.event === "CUSTOM" || raw.type === "CUSTOM");
         const value = (raw.value ?? raw.args ?? {}) as Record<string, unknown>;
         const pipelineType = isCustom ? (raw.name as AguiEventType | undefined) : undefined;
@@ -138,9 +137,9 @@ export function useAguiStream(backendUrl: string) {
           sections: value.sections as { heading?: string; body?: string }[] | undefined,
           ts: raw.ts > 1_000_000_000 ? Math.round(raw.ts * 1000) : raw.ts,
         };
-        // Skip bare heartbeat STATE_DELTAs from the phase-0 stub
+        // Skip bare heartbeat STATE_DELTAs
         if (normalized.type === "STATE_DELTA" && normalized.agent === "system") return;
-        // Skip A2UI surface CUSTOM events — handled by useA2UIBridge
+        // Skip A2UI surface events — handled by useA2UIBridge
         if (isCustom && ["surfaceUpdate","dataModelUpdate","beginRendering",
             "createSurface","updateComponents","updateDataModel"].includes(raw.name as string)) return;
         pushEvent(assignId(normalized));
@@ -150,9 +149,13 @@ export function useAguiStream(backendUrl: string) {
     };
 
     es.onerror = () => {
-      clearTimeout(timeout);
-      es.close();
-      startMockStream();
+      // Only fall back to mocks if we never successfully connected
+      if (!everConnectedRef.current) {
+        clearTimeout(timeout);
+        es.close();
+        startMockStream();
+      }
+      // If we were connected, SSE will auto-reconnect — don't close or load mocks
     };
 
     return () => {
