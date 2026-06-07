@@ -98,8 +98,10 @@ export function LossChart({ onStopRef }: LossChartProps = {}) {
 
   function play() {
     if (isPlaying) return;
+    if (timerRef.current) clearInterval(timerRef.current);
     setVisibleCount(0);
     setShowVerdict(false);
+    setStopped(false);
     setIsPlaying(true);
 
     let i = 0;
@@ -168,7 +170,7 @@ export function LossChart({ onStopRef }: LossChartProps = {}) {
           )}
           <button
             onClick={play}
-            disabled={isPlaying || stopped}
+            disabled={isPlaying}
             className="text-xs px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 disabled:opacity-40 transition-colors"
           >
             {isPlaying ? "streaming..." : "▶ replay"}

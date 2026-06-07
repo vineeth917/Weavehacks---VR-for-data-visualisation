@@ -7,10 +7,13 @@ export function TrainingVerdictCard({ sendAction: _ }: { sendAction?: unknown })
   if (!getSurface("training-verdict")) return null;
 
   return (
-    <div className="rounded-xl bg-gray-900 border border-yellow-500/40 p-3">
-      <p className="text-xs text-yellow-400 font-semibold uppercase tracking-wider mb-2">
-        Training Monitor verdict
-      </p>
+    <div className="rounded-xl border-2 border-yellow-500/70 bg-gray-950 p-3 shadow-lg shadow-yellow-500/10">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-yellow-400 text-sm">⚠</span>
+        <p className="text-xs text-yellow-300 font-bold uppercase tracking-widest">
+          Training Monitor Verdict
+        </p>
+      </div>
       <A2UIRenderer surfaceId="training-verdict" fallback={null} />
     </div>
   );

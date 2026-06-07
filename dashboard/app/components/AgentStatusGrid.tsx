@@ -6,20 +6,26 @@ interface Props {
   events: AguiEvent[];
 }
 
-const AGENTS = ["router", "eda", "training_monitor", "narrator", "preprocessor"];
+const CORE_AGENTS = ["router", "eda", "training_monitor", "narrator"];
+
 const AGENT_LABELS: Record<string, string> = {
-  router: "Router",
-  eda: "EDA Agent",
+  router:           "Router",
+  eda:              "EDA Agent",
   training_monitor: "Training Monitor",
-  narrator: "Narrator",
-  preprocessor: "Preprocessor",
+  narrator:         "Narrator",
+  preprocessor:     "Preprocessor",
+  evals:            "Evaluator",
+  trainer:          "Trainer",
 };
+
 const AGENT_DESC: Record<string, string> = {
-  router: "Routes queries to specialists",
-  eda: "Profiles data, generates panels",
+  router:           "Routes queries to specialists",
+  eda:              "Profiles data, generates panels",
   training_monitor: "Watches train/val curves",
-  narrator: "Speaks the final report",
-  preprocessor: "Pre-processes incoming data",
+  narrator:         "Speaks the final report",
+  preprocessor:     "Pre-processes incoming data",
+  evals:            "Runs evaluation suite",
+  trainer:          "Trains the model",
 };
 
 function deriveAgentState(agent: string, events: AguiEvent[]): string {
@@ -46,24 +52,30 @@ function deriveAgentState(agent: string, events: AguiEvent[]): string {
   return "active";
 }
 
-function deriveLastAction(agent: string, events: AguiEvent[]): string {
+function deriveDetail(agent: string, events: AguiEvent[]): { label: string; value: string } | null {
   const relevant = events.filter((e) => e.agent === agent);
-  if (relevant.length === 0) return "—";
+  if (relevant.length === 0) return null;
   const last = relevant[relevant.length - 1];
-  if (last.type === "speech" && last.text) return `"${last.text.slice(0, 45)}…"`;
-  if (last.type === "agent_status" && last.message) return last.message.slice(0, 50);
-  if (last.tool) return `${last.type === "TOOL_CALL_START" ? "calling" : "done"} ${last.tool}`;
-  if (last.message) return last.message.slice(0, 50);
-  return last.type;
+  if (last.type === "TOOL_CALL_START" && last.tool)
+    return { label: "calling", value: last.tool };
+  if (last.type === "TOOL_CALL_END" && last.tool)
+    return { label: "done", value: last.tool };
+  if (last.type === "speech" && last.text)
+    return { label: "says", value: `"${last.text.slice(0, 40)}${last.text.length > 40 ? "…" : ""}"` };
+  if (last.type === "agent_status" && last.message)
+    return { label: "status", value: last.message.slice(0, 45) };
+  if (last.message)
+    return { label: "", value: last.message.slice(0, 50) };
+  return null;
 }
 
 const STATE_STYLES: Record<string, string> = {
-  idle:     "bg-gray-900 border-gray-800 opacity-50",
-  active:   "bg-gray-800 border-gray-600",
-  working:  "bg-gray-800 border-yellow-500/60 shadow-yellow-500/10 shadow-lg",
-  speaking: "bg-gray-800 border-pink-500/60 shadow-pink-500/10 shadow-lg",
-  done:     "bg-gray-800 border-green-500/50",
-  error:    "bg-gray-800 border-red-500/60",
+  idle:     "bg-gray-900 border-gray-800 opacity-40",
+  active:   "bg-gray-900 border-gray-600",
+  working:  "bg-gray-900 border-yellow-400/80 shadow-yellow-400/15 shadow-lg",
+  speaking: "bg-gray-900 border-pink-400/80 shadow-pink-400/15 shadow-lg",
+  done:     "bg-gray-900 border-green-400/60",
+  error:    "bg-gray-900 border-red-400/70",
 };
 
 const STATE_LABEL: Record<string, string> = {
@@ -75,59 +87,72 @@ const STATE_LABEL: Record<string, string> = {
   error:    "error",
 };
 
+const STATE_LABEL_COLOR: Record<string, string> = {
+  idle:     "text-gray-600",
+  active:   "text-blue-400",
+  working:  "text-yellow-400",
+  speaking: "text-pink-400",
+  done:     "text-green-400",
+  error:    "text-red-400",
+};
+
 export function AgentStatusGrid({ events }: Props) {
-  const activeAgents = AGENTS.filter((a) =>
-    events.some(
-      (e) =>
-        e.agent === a ||
-        (e.type === "HANDOFF" && e.to === a) ||
-        (e.type === "agent_status" && e.agent === a)
-    )
-  );
-
-  // Always show the 4 core agents; add real-backend agents dynamically
   const extraAgents = [...new Set(events.map((e) => e.agent))]
-    .filter((a) => a && a !== "system" && !AGENTS.includes(a));
+    .filter((a) => a && a !== "system" && !CORE_AGENTS.includes(a));
 
-  const displayed = [...new Set([...AGENTS.slice(0, 4), ...activeAgents, ...extraAgents])];
+  const displayed = [...new Set([...CORE_AGENTS, ...extraAgents])];
 
   return (
     <div className="grid grid-cols-2 gap-2">
       {displayed.map((agent) => {
         const state = deriveAgentState(agent, events);
-        const lastAction = deriveLastAction(agent, events);
+        const detail = deriveDetail(agent, events);
         const color = agentColor(agent);
+        const isActive = state !== "idle";
 
         return (
           <div
             key={agent}
-            className={`rounded-xl border p-2.5 transition-all duration-500 ${STATE_STYLES[state] ?? "bg-gray-800 border-gray-600"}`}
+            className={`rounded-xl border-2 p-2.5 transition-all duration-500 ${STATE_STYLES[state] ?? "bg-gray-900 border-gray-700"}`}
           >
-            <div className="flex items-center justify-between mb-1 gap-1">
-              <span className="text-xs font-bold truncate" style={{ color }}>
+            {/* Name + state badge */}
+            <div className="flex items-start justify-between gap-1 mb-1">
+              <span className="text-xs font-extrabold leading-tight" style={{ color }}>
                 {AGENT_LABELS[agent] ?? agent}
               </span>
-              <span
-                className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
-                style={{
-                  backgroundColor: color + "22",
-                  color,
-                  border: `1px solid ${color}44`,
-                }}
-              >
+              <span className={`text-xs font-bold flex-shrink-0 ${STATE_LABEL_COLOR[state] ?? "text-gray-400"}`}>
                 {STATE_LABEL[state] ?? state}
               </span>
             </div>
-            <p className="text-gray-500 text-xs mb-1 leading-tight">
+
+            {/* Description */}
+            <p className="text-gray-500 text-xs mb-1.5 leading-snug">
               {AGENT_DESC[agent] ?? "Agent"}
             </p>
-            <p className="text-gray-400 text-xs truncate leading-snug">{lastAction}</p>
 
+            {/* Detail row — tool call / speech / status */}
+            {isActive && detail ? (
+              <div className="flex items-center gap-1 mt-1">
+                {detail.label && (
+                  <span className="text-gray-600 text-xs">{detail.label}</span>
+                )}
+                <span
+                  className="text-xs font-semibold truncate"
+                  style={{ color: detail.label === "calling" ? "#fbbf24" : detail.label === "says" ? color : "#d1d5db" }}
+                >
+                  {detail.value}
+                </span>
+              </div>
+            ) : !isActive ? (
+              <p className="text-gray-700 text-xs">—</p>
+            ) : null}
+
+            {/* Activity bar */}
             {(state === "working" || state === "speaking") && (
-              <div className="mt-1.5 h-0.5 rounded-full overflow-hidden bg-gray-700">
+              <div className="mt-2 h-0.5 rounded-full overflow-hidden bg-gray-800">
                 <div
                   className="h-full rounded-full animate-pulse"
-                  style={{ backgroundColor: color, width: "60%" }}
+                  style={{ backgroundColor: color, width: "65%" }}
                 />
               </div>
             )}

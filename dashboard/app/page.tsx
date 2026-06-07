@@ -28,7 +28,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="text-lg font-bold text-white tracking-tight">
-            HoloLab — Agent Swarm
+            DataDive — Agent Swarm
           </h1>
           <p className="text-gray-500 text-xs">
             Live orchestration view · WeaveHacks 4

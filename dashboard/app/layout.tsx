@@ -3,8 +3,8 @@ import "./globals.css";
 import { Providers } from "./components/Providers";
 
 export const metadata: Metadata = {
-  title: "HoloLab — Agent Swarm Dashboard",
-  description: "Live spectator view of the HoloLab multi-agent swarm",
+  title: "DataDive — Agent Swarm Dashboard",
+  description: "Live spectator view of the DataDive multi-agent swarm",
 };
 
 export default function RootLayout({

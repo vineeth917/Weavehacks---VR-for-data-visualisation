@@ -7,10 +7,13 @@ export function EDAActionCard({ sendAction: _ }: { sendAction?: unknown }) {
   if (!getSurface("eda-action")) return null;
 
   return (
-    <div className="rounded-xl bg-gray-900 border border-indigo-500/40 p-3">
-      <p className="text-xs text-indigo-400 font-semibold uppercase tracking-wider mb-2">
-        Agent suggests action
-      </p>
+    <div className="rounded-xl border-2 border-indigo-500/70 bg-gray-950 p-3 shadow-lg shadow-indigo-500/10">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+        <p className="text-xs text-indigo-300 font-bold uppercase tracking-widest">
+          Agent Suggestion
+        </p>
+      </div>
       <A2UIRenderer surfaceId="eda-action" fallback={null} />
     </div>
   );

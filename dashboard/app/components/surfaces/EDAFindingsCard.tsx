@@ -8,14 +8,17 @@ interface Props {
 
 export function EDAFindingsCard({ className }: Props) {
   return (
-    <div className={`rounded-xl bg-gray-900 border border-emerald-500/30 p-3 ${className ?? ""}`}>
-      <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-2">
-        EDA Findings
-      </p>
+    <div className={`rounded-xl border-2 border-emerald-500/70 bg-gray-950 p-3 shadow-lg shadow-emerald-500/10 ${className ?? ""}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+        <p className="text-xs text-emerald-300 font-bold uppercase tracking-widest">
+          EDA Findings
+        </p>
+      </div>
       <A2UIRenderer
         surfaceId="eda-findings"
         fallback={
-          <p className="text-gray-600 text-xs italic">
+          <p className="text-gray-500 text-xs italic">
             Waiting for EDA agent to profile dataset…
           </p>
         }
