@@ -22,21 +22,32 @@ export default function Dashboard() {
 
   const lastQuery = [...events].reverse().find((e) => e.type === "voice_query" && e.text);
 
-  // Extract dataset name: from profile_dataset tool args path, or training_update
+  // Extract dataset name from real backend events.
+  // Backend emits AgentStatus with message "panels=N findings=N ds=<name>"
+  // Also falls back to TOOL_CALL_START profile_dataset args.dataset
   const datasetName = (() => {
-    // Check profile_dataset tool calls — args.path = "data/housing.csv" → "housing.csv"
-    const profileCall = [...events].find(
+    // 1. agent_status message contains "ds=<name>"
+    for (const ev of [...events].reverse()) {
+      if ((ev.type === "agent_status" || ev.type === "STATE_DELTA") && ev.message) {
+        const m = ev.message.match(/\bds=([^\s,]+)/);
+        if (m) return m[1];
+      }
+    }
+    // 2. TOOL_CALL_START with tool=profile_dataset, args.dataset or args.name
+    const profileCall = events.find(
       (e) => e.type === "TOOL_CALL_START" && e.tool === "profile_dataset" && e.args
     );
     if (profileCall?.args) {
-      const path = String(profileCall.args.path ?? profileCall.args.dataset ?? "");
-      if (path) return path.split("/").pop() ?? path;
+      const val = profileCall.args.dataset ?? profileCall.args.name;
+      if (val) return String(val);
     }
-    // Fallback: training_update with dataset field
-    const tuEvent = [...events].reverse().find(
-      (e) => e.type === "training_update" && (e.args as Record<string, unknown>)?.dataset
-    );
-    if (tuEvent?.args) return String((tuEvent.args as Record<string, unknown>).dataset);
+    // 3. voice_query or RUN_STARTED message mentioning "dataset loaded: <name>"
+    for (const ev of events) {
+      if (ev.message) {
+        const m = ev.message.match(/dataset loaded:\s*([^\s]+)/i);
+        if (m) return m[1];
+      }
+    }
     return undefined;
   })();
 
