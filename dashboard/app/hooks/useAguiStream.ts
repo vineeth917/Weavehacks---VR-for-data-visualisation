@@ -106,7 +106,15 @@ export function useAguiStream(backendUrl: string) {
       setStatus("connected");
     };
 
+    // Also mark connected on first message in case onopen fires late
+    let markedConnected = false;
+
     es.onmessage = (e) => {
+      if (!markedConnected) {
+        markedConnected = true;
+        clearTimeout(timeout);
+        setStatus("connected");
+      }
       try {
         const raw = JSON.parse(e.data);
         // Backend sends {event, agent, tool, args, result, ts (unix secs)}
