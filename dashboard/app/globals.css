@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* A2UI dark-theme overrides */
+  --a2ui-primary-color: #6366f1;
+  --a2ui-bg: #1f2937;
+  --a2ui-text: #f3f4f6;
+  --a2ui-border: #374151;
 }
 
 @theme inline {
@@ -12,15 +18,36 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Force A2UI renderer buttons to match dark dashboard.
+   A2UI uses inline styles so we target the wrapper class we add. */
+.a2ui-dark button {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+  border: 1px solid #4b5563 !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  transition: background-color 0.15s, border-color 0.15s !important;
+  cursor: pointer !important;
+}
+
+.a2ui-dark button:hover {
+  background-color: #374151 !important;
+  border-color: #6b7280 !important;
+}
+
+/* Primary buttons (inline style has #007bff) — override to indigo */
+.a2ui-dark button[style*="007bff"] {
+  background-color: #6366f1 !important;
+  border-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+.a2ui-dark button[style*="007bff"]:hover {
+  background-color: #4f46e5 !important;
 }

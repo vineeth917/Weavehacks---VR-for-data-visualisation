@@ -64,10 +64,15 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function LossChart() {
+interface LossChartProps {
+  onStopRef?: React.MutableRefObject<(() => void) | null>;
+}
+
+export function LossChart({ onStopRef }: LossChartProps = {}) {
   const [allData, setAllData] = useState<HistoryPoint[]>([]);
   const [visibleCount, setVisibleCount] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [stopped, setStopped] = useState(false);
   const [showVerdict, setShowVerdict] = useState(false);
   const [runId, setRunId] = useState<string>("");
   const [entry, setEntry] = useState<RunEntry | null>(null);
@@ -109,15 +114,27 @@ export function LossChart() {
     }, 140);
   }
 
+  function stopTraining() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsPlaying(false);
+    setStopped(true);
+    setShowVerdict(true);
+  }
+
   function reset() {
     if (timerRef.current) clearInterval(timerRef.current);
     setIsPlaying(false);
+    setStopped(false);
     setVisibleCount(0);
     setShowVerdict(false);
   }
 
-  // Stream one point at a time when training_update events arrive from the real backend
-  // (parent can call this via ref — for now auto-play on mount after a delay)
+  // Expose stopTraining to parent via ref
+  useEffect(() => {
+    if (onStopRef) onStopRef.current = stopTraining;
+  });
+
+  // Auto-play on data load
   useEffect(() => {
     if (allData.length > 0) {
       const t = setTimeout(() => play(), 1200);
@@ -143,10 +160,15 @@ export function LossChart() {
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {stopped && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/40 text-red-400">
+              ■ stopped
+            </span>
+          )}
           <button
             onClick={play}
-            disabled={isPlaying}
+            disabled={isPlaying || stopped}
             className="text-xs px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/20 disabled:opacity-40 transition-colors"
           >
             {isPlaying ? "streaming..." : "▶ replay"}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useCallback } from "react";
 import { useAguiStream } from "./hooks/useAguiStream";
 import { EventTimeline } from "./components/EventTimeline";
 import { AgentStatusGrid } from "./components/AgentStatusGrid";
@@ -13,29 +14,32 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:808
 
 export default function Dashboard() {
   const { events, status, replayMock } = useAguiStream(BACKEND_URL);
+  const stopTrainingRef = useRef<(() => void) | null>(null);
 
-  // Latest voice query from the Quest (now comes through /agui via _send mirror)
+  const handleStopTraining = useCallback(() => {
+    stopTrainingRef.current?.();
+  }, []);
+
   const lastQuery = [...events].reverse().find((e) => e.type === "voice_query" && e.text);
 
   return (
-    <div className="h-screen flex flex-col p-4 gap-3 overflow-hidden">
+    <div className="h-screen flex flex-col p-3 gap-2 overflow-hidden" style={{ minWidth: 1200 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
+          <h1 className="text-lg font-bold text-white tracking-tight">
             HoloLab — Agent Swarm
           </h1>
-          <p className="text-gray-500 text-xs mt-0.5">
+          <p className="text-gray-500 text-xs">
             Live orchestration view · WeaveHacks 4
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Live Quest query banner */}
+        <div className="flex items-center gap-2">
           {lastQuery && (
             <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-3 py-1.5">
               <span className="text-xs">🎤</span>
               <span className="text-xs text-indigo-300 max-w-xs truncate italic">
-                "{lastQuery.text}"
+                &ldquo;{lastQuery.text}&rdquo;
               </span>
             </div>
           )}
@@ -49,26 +53,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main grid: 5 columns */}
-      <div className="flex-1 grid grid-cols-5 gap-3 min-h-0">
+      {/* Main grid: 5 equal columns, no wrap */}
+      <div className="flex-1 grid gap-2 min-h-0" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
 
         {/* Col 1: Swarm graph + agent status */}
-        <div className="flex flex-col gap-3 min-h-0">
+        <div className="flex flex-col gap-2 min-h-0 overflow-hidden">
           <SwarmGraph events={events} />
-          <AgentStatusGrid events={events} />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <AgentStatusGrid events={events} />
+          </div>
         </div>
 
-        {/* Col 2: Loss chart */}
+        {/* Col 2: Training loss chart */}
         <div className="flex flex-col min-h-0">
-          <LossChart />
+          <LossChart onStopRef={stopTrainingRef} />
         </div>
 
         {/* Col 3: A2UI agent-generated surfaces */}
-        <div className="flex flex-col min-h-0 overflow-y-auto">
-          <A2UIPanel backendUrl={BACKEND_URL} />
+        <div className="flex flex-col min-h-0">
+          <A2UIPanel backendUrl={BACKEND_URL} onStopTraining={handleStopTraining} />
         </div>
 
-        {/* Col 4: Live pipeline feed (mirrored from /ws via /agui) */}
+        {/* Col 4: Live pipeline feed */}
         <div className="flex flex-col min-h-0">
           <PipelineFeed events={events} status={status} />
         </div>
@@ -84,7 +90,7 @@ export default function Dashboard() {
       </div>
 
       {/* Footer */}
-      <div className="text-center text-gray-700 text-xs">
+      <div className="text-center text-gray-700 text-xs flex-shrink-0">
         W&amp;B Weave · OpenAI Agents SDK · Redis · CopilotKit AG-UI
       </div>
     </div>
