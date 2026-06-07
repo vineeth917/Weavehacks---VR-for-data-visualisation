@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.a2ui import ACTIONS
+from backend.a2ui import ACTIONS, BUTTON_MODE
 
 # ---------------------------------------------------------------------------
 # tiny DSL helpers — keep callers readable
@@ -62,17 +62,50 @@ def _card(cid: str, child_id: str) -> dict[str, Any]:
 
 def _button(cid: str, *, label: str, action: str,
             context: dict[str, Any] | None = None,
-            variant: str = "primary") -> dict[str, Any]:
+            variant: str = "primary",
+            mode: str | None = None) -> dict[str, Any]:
+    """Build a Button component, honouring the wire-shape mode.
+
+    mode="v08" (default — A2UI_BUTTON_MODE=v08, our shipped/tested shape):
+        {"action": "<name>", "context": {"contents": [{"key":..., "valueString":...}, ...]}}
+
+    mode="v09" (A2UI v0.9 canonical action schema, per
+    https://a2ui.org/concepts/actions/):
+        {"action": {"event": {"name": "<name>", "context": {literal map}}}}
+
+    The renderer side: in v08, our backend handles the userAction shape on
+    /ws (UserAction model). In v09, dashboards typically POST to /action
+    with `{action:{name, surfaceId, sourceComponentId, timestamp, context}}`
+    — backend.main exposes that endpoint and normalises both shapes into
+    the same internal Interaction. Person C should confirm the renderer
+    actually emits one of those two shapes before we flip the default.
+    """
     assert action in ACTIONS, f"action {action!r} not in frozen ACTIONS set"
+    eff_mode = (mode or BUTTON_MODE).lower()
+
+    if eff_mode == "v09":
+        # Literal context map — values pre-resolved server-side.
+        # (v0.9 also supports {"path": "/..."} bindings; we don't need them
+        # here because every button's context is already concrete.)
+        evt: dict[str, Any] = {"name": action}
+        if context:
+            evt["context"] = dict(context)
+        props: dict[str, Any] = {
+            "label": {"literalString": label},
+            "action": {"event": evt},
+            "variant": variant,
+        }
+        return _comp(cid, "Button", props)
+
+    # default: v08 (current/tested)
     ctx_entries = []
     if context:
         for k, v in context.items():
-            # v0.8 context is the same adjacency-list value encoding
             from backend.a2ui.values import encode_value
             entry = {"key": k}
             entry.update(encode_value(v))
             ctx_entries.append(entry)
-    props: dict[str, Any] = {
+    props = {
         "label": {"literalString": label},
         "action": action,
         "variant": variant,

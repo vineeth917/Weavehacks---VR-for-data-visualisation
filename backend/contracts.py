@@ -38,7 +38,7 @@ class VoiceQuery(BaseModel):
 class Command(BaseModel):
     type: Literal["command"] = "command"
     session_id: str
-    action: Literal["load_dataset", "train_baseline", "run_evals", "reset"]
+    action: Literal["load_dataset", "load_run", "train_baseline", "run_evals", "reset", "narrate"]
     params: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -224,6 +224,7 @@ AGUIEventName = Literal[
     "TOOL_CALL_END",
     "STATE_DELTA",
     "HANDOFF",
+    "AGENT_THINKING",
     "RUN_FINISHED",
     "CUSTOM",       # generic extension hook; A2UI envelopes ride here
     "USER_ACTION",  # client → server replay of an A2UI userAction

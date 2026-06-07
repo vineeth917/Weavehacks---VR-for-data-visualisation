@@ -103,14 +103,92 @@ async def _sse_collect(n: int, timeout_per_event: float = 5.0,
     return out
 
 
+def _custom_surface_id(payload: dict[str, Any]) -> str | None:
+    """Extract surfaceId from a CUSTOM A2UI envelope."""
+    val = payload.get("value")
+    if not isinstance(val, dict):
+        return None
+    for key in ("surfaceUpdate", "dataModelUpdate", "beginRendering"):
+        inner = val.get(key)
+        if isinstance(inner, dict) and inner.get("surfaceId"):
+            return inner["surfaceId"]
+    return None
+
+
+async def _sse_collect_surface_triple(surface_id: str, timeout: float = 30.0,
+                                    skip_state_delta: bool = True) -> list[dict[str, Any]]:
+    """Wait for surfaceUpdate → dataModelUpdate → beginRendering for one surface.
+
+    Skips replay-buffer CUSTOM frames for other surfaces that arrive on connect.
+    """
+    expected = ["surfaceUpdate", "dataModelUpdate", "beginRendering"]
+    matched: list[dict[str, Any]] = []
+    deadline = time.time() + timeout
+    async with httpx.AsyncClient(timeout=None) as client:
+        async with client.stream("GET", AGUI_URL, headers={"Accept": "text/event-stream"}) as resp:
+            assert resp.status_code == 200, f"/agui status {resp.status_code}"
+            async for line in resp.aiter_lines():
+                if time.time() > deadline:
+                    break
+                if not line.startswith("data:"):
+                    continue
+                payload = json.loads(line[len("data:"):].strip())
+                if skip_state_delta and payload.get("event") == "STATE_DELTA":
+                    continue
+                if payload.get("event") != "CUSTOM":
+                    continue
+                name = payload.get("name")
+                if name != expected[len(matched)]:
+                    continue
+                if _custom_surface_id(payload) != surface_id:
+                    continue
+                matched.append(payload)
+                if len(matched) == 3:
+                    return matched
+    return matched
+
+
+async def _sse_wait_for_user_action(action: str, timeout: float = 8.0,
+                                    skip_state_delta: bool = True) -> list[dict[str, Any]]:
+    """Collect SSE events until a matching USER_ACTION arrives.
+
+    New /agui subscribers receive the replay ring buffer first (HANDOFF +
+    A2UI surfaces from earlier in the test). Grabbing only the first event
+    therefore returns stale CUSTOM frames — wait for the action we just sent.
+    """
+    out: list[dict[str, Any]] = []
+    deadline = time.time() + timeout
+    async with httpx.AsyncClient(timeout=None) as client:
+        async with client.stream("GET", AGUI_URL, headers={"Accept": "text/event-stream"}) as resp:
+            assert resp.status_code == 200, f"/agui status {resp.status_code}"
+            async for line in resp.aiter_lines():
+                if time.time() > deadline:
+                    break
+                if not line.startswith("data:"):
+                    continue
+                payload = json.loads(line[len("data:"):].strip())
+                if skip_state_delta and payload.get("event") == "STATE_DELTA":
+                    continue
+                out.append(payload)
+                if payload.get("event") == "USER_ACTION":
+                    if (payload.get("args") or {}).get("action") == action:
+                        return out
+                elif (payload.get("event") == "CUSTOM"
+                      and payload.get("name") == "USER_ACTION"
+                      and (payload.get("value") or {}).get("action") == action):
+                    return out
+    return out
+
+
 # ---------------------------------------------------------------------------
 # T2 + T3 + T4: ws + sse coordination
 # ---------------------------------------------------------------------------
 async def t2_t3_select_point_triggers_surface() -> None:
     print("\n=== T2 + T3. select_point on /ws triggers A2UI surface on /agui ===")
 
-    # Subscribe to /agui FIRST so we don't miss the events
-    sse_task = asyncio.create_task(_sse_collect(3, timeout_per_event=8.0))
+    # Subscribe to /agui FIRST so we don't miss the events.
+    # Use surface-filtered collect — replay buffer may prepend stale CUSTOM frames.
+    sse_task = asyncio.create_task(_sse_collect_surface_triple("eda-action", timeout=30.0))
     await asyncio.sleep(0.6)  # let the subscription register
 
     ws_frames: list[dict[str, Any]] = []
@@ -119,11 +197,14 @@ async def t2_t3_select_point_triggers_surface() -> None:
             "type": "interaction", "session_id": SID,
             "action": "select_point", "point_ids": ["r12", "r37", "r91"],
         }))
-        # collect frames until 0.6s silence
-        while True:
+        # the real EDA agent now answers here — wait up to 30s for done
+        deadline = time.time() + 30.0
+        while time.time() < deadline:
             try:
-                frame = json.loads(await asyncio.wait_for(ws.recv(), timeout=0.6))
+                frame = json.loads(await asyncio.wait_for(ws.recv(), timeout=8.0))
                 ws_frames.append(frame)
+                if frame.get("type") == "agent_status" and frame.get("state") in ("done", "error"):
+                    break
             except asyncio.TimeoutError:
                 break
 
@@ -183,7 +264,7 @@ async def t2_t3_select_point_triggers_surface() -> None:
 async def t4_action_strings() -> None:
     print("\n=== T4. each A2UI action string round-trips to USER_ACTION on /agui ===")
     for action in ("confirm_transform", "dismiss", "stop_training", "keep_training"):
-        sse_task = asyncio.create_task(_sse_collect(1, timeout_per_event=6.0))
+        sse_task = asyncio.create_task(_sse_wait_for_user_action(action, timeout=8.0))
         await asyncio.sleep(0.4)
 
         async with websockets.connect(WS_URL, open_timeout=5) as ws:
@@ -191,24 +272,18 @@ async def t4_action_strings() -> None:
                 "type": "interaction", "session_id": SID, "action": action,
                 "context": {"column": "price", "transform": "log"},
             }))
-            # consume ws ack
+            # these actions are not agent-routed; they ack instantly
             try:
-                _ = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                _ = await asyncio.wait_for(ws.recv(), timeout=3.0)
             except asyncio.TimeoutError:
                 pass
 
-        events = await asyncio.wait_for(sse_task, timeout=8.0)
-        # Match against either first-class USER_ACTION OR CUSTOM-wrapped (both legal).
-        matched = False
-        for e in events:
-            if e.get("event") == "USER_ACTION":
-                if (e.get("args") or {}).get("action") == action:
-                    matched = True
-                    break
-            elif e.get("event") == "CUSTOM" and e.get("name") == "USER_ACTION":
-                if (e.get("value") or {}).get("action") == action:
-                    matched = True
-                    break
+        events = await asyncio.wait_for(sse_task, timeout=10.0)
+        matched = bool(events) and (
+            events[-1].get("event") == "USER_ACTION"
+            or (events[-1].get("event") == "CUSTOM"
+                and events[-1].get("name") == "USER_ACTION")
+        )
         if matched:
             _ok(f"{action}: round-tripped to USER_ACTION")
         else:

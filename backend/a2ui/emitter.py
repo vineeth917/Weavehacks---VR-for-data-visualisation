@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from typing import Any
 
 from backend.a2ui import DEFAULT_CATALOG, SPEC_VERSION
@@ -26,6 +27,9 @@ log = logging.getLogger("hololab.a2ui")
 # ---------------------------------------------------------------------------
 
 _subscribers: set[asyncio.Queue[dict[str, Any]]] = set()
+# Last N events replayed to every new /agui subscriber so a client that
+# connects after a voice_query still sees HANDOFF + A2UI surfaces.
+_REPLAY: deque[dict[str, Any]] = deque(maxlen=64)
 
 
 def subscribe() -> asyncio.Queue[dict[str, Any]]:
@@ -38,8 +42,14 @@ def unsubscribe(q: asyncio.Queue[dict[str, Any]]) -> None:
     _subscribers.discard(q)
 
 
+def replay_buffer() -> list[dict[str, Any]]:
+    """Snapshot of recent AG-UI events for new SSE subscribers."""
+    return list(_REPLAY)
+
+
 def _broadcast(event: dict[str, Any]) -> None:
     """Fan out to every subscriber. Drops on full queue."""
+    _REPLAY.append(event)
     for q in list(_subscribers):
         try:
             q.put_nowait(event)
