@@ -1,4 +1,9 @@
-const WS_URL = 'wss://scenic-willow-recall-timothy.trycloudflare.com/ws';
+// Default: Person A backend on same machine. On same WiFi, override once:
+//   ?ws=ws://<A_LAN_IP>:8080/ws
+const WS_URL =
+  new URLSearchParams(window.location.search).get('ws') ?? 'ws://localhost:8080/ws';
+export const API_BASE = WS_URL.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/ws$/, '');
+export const TRANSCRIBE_URL = `${API_BASE}/transcribe`;
 const SESSION_ID = 's1';
 const RECONNECT_DELAY_MS = 3000;
 
@@ -8,6 +13,10 @@ let reconnectTimer = null;
 let mockResponses = null;
 
 const mockMode = new URLSearchParams(window.location.search).get('mock') === '1';
+
+export function isMockMode() {
+  return mockMode;
+}
 
 function dispatchMessage(msg) {
   console.log(`WebSocket message received: ${msg.type}`, msg);
@@ -26,10 +35,20 @@ export function isConnected() {
 }
 
 const connectionListeners = new Set();
+const connectListeners = new Set();
 
 export function onConnectionChange(fn) {
   connectionListeners.add(fn);
   fn(isConnected());
+}
+
+export function onConnect(fn) {
+  connectListeners.add(fn);
+  if (isConnected()) fn();
+}
+
+function notifyConnect() {
+  connectListeners.forEach((fn) => fn());
 }
 
 function notifyConnection(connected) {
@@ -159,6 +178,7 @@ function connect() {
   ws.addEventListener('open', () => {
     console.log('WebSocket connected');
     notifyConnection(true);
+    notifyConnect();
   });
 
   ws.addEventListener('message', (event) => {
@@ -188,6 +208,7 @@ function normalizeMessage(data, type) {
 async function runMockMode() {
   console.log('Mock mode enabled — skipping WebSocket connection');
   notifyConnection(true);
+  notifyConnect();
 
   setTimeout(async () => {
     try {
@@ -211,11 +232,16 @@ async function runMockMode() {
 
   setTimeout(async () => {
     try {
-      const resp = await fetch('/mocks/training_verdict.json');
-      const data = await resp.json();
-      dispatchMessage(normalizeMessage(data, 'training_update'));
+      const resp = await fetch('/mocks/training_updates.json');
+      const updates = await resp.json();
+      for (let i = 0; i < updates.length; i++) {
+        if (i > 0) {
+          await new Promise((resolve) => setTimeout(resolve, 60));
+        }
+        dispatchMessage(normalizeMessage(updates[i], 'training_update'));
+      }
     } catch (err) {
-      console.error('Failed to load training_verdict mock', err);
+      console.error('Failed to load training_updates mock', err);
     }
   }, 3000);
 

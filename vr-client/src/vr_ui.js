@@ -53,7 +53,7 @@ function setMicListening(listening) {
   micButtonMesh.material.needsUpdate = true;
 }
 
-export function initVRUI(camera, renderer, { onMic, onExit, onStatusChange }) {
+export function initVRUI(camera, renderer, { onMic, onExit, onLoadCharts, onStatusChange }) {
   hudGroup = new THREE.Group();
   hudGroup.name = 'vrHud';
   camera.add(hudGroup);
@@ -69,10 +69,13 @@ export function initVRUI(camera, renderer, { onMic, onExit, onStatusChange }) {
   statusSprite.position.set(0, 0.12, 0);
   hudGroup.add(statusSprite);
 
-  micButtonMesh = createButton('Mic', 'mic', -0.17, -0.05, '#2a5a2a');
+  micButtonMesh = createButton('Mic', 'mic', -0.22, -0.05, '#2a5a2a');
   hudGroup.add(micButtonMesh);
 
-  const exitButton = createButton('Exit VR', 'exit', 0.17, -0.05, '#5a2a2a');
+  const loadButton = createButton('Charts', 'load_eda', 0, -0.05, '#2a3a5a');
+  hudGroup.add(loadButton);
+
+  const exitButton = createButton('Exit VR', 'exit', 0.22, -0.05, '#5a2a2a');
   hudGroup.add(exitButton);
 
   const hint = new THREE.Mesh(
@@ -99,6 +102,7 @@ export function initVRUI(camera, renderer, { onMic, onExit, onStatusChange }) {
     updateStatus,
     handleUIAction(action) {
       if (action === 'mic') onMic?.();
+      if (action === 'load_eda') onLoadCharts?.();
       if (action === 'exit') {
         const session = renderer.xr.getSession();
         if (session) session.end();

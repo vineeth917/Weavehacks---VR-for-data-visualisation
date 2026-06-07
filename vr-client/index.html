@@ -37,33 +37,53 @@
   <button id="mic-btn">Enable Mic</button>
 
   <script type="module">
-    import { initScene, scene, camera, renderer, onXRSessionStart, shouldBootstrapData } from './src/scene.js';
-    import { onMessage, sendQuery, sendLoadRun, onConnectionChange } from './src/ws.js';
+    import { initScene, scene, camera, renderer, onXRSessionStart, setFrameUpdateCallback } from './src/scene.js';
+    import { onMessage, sendQuery, sendLoadRun, onConnectionChange, onConnect, isMockMode } from './src/ws.js';
     import { renderPanels } from './src/panels.js';
     import { renderScatter } from './src/scatter3d.js';
-    import { initTrainingDisplay, showTrainingVerdict, clearTrainingDisplay } from './src/training_verdict.js';
+    import { showTrainingVerdict, clearTrainingDisplay } from './src/training_verdict.js';
+    import { initRibbon, addTrainingStep, clearRibbon, readLosses } from './src/loss_ribbon.js';
     import { initVoice, speak, startListening, onMicStateChange } from './src/voice.js';
     import { renderKDESurface, renderCorrField } from './src/renderers.js';
     import { highlightTargets } from './src/highlight.js';
-    import { initInteractions } from './src/interactions.js';
+    import { initInteractions, updateXRInteractions, notifySceneObjectsChanged } from './src/interactions.js';
     import { renderReport } from './src/report.js';
     import { initVRUI } from './src/vr_ui.js';
 
     function handleVoiceQuery(transcript) {
       console.log('Voice query:', transcript);
-      const needsTrainingRun = /\b(overfit|overfitting|training|train loss|val loss|validation loss|loss curve|my model)\b/i.test(transcript);
-      if (needsTrainingRun) {
+      const needsTraining = /\b(overfit|overfitting|training|train loss|val loss|validation loss|loss curve|my model|train the model|train model)\b/i.test(transcript);
+      if (needsTraining) {
+        clearRibbon();
         clearTrainingDisplay();
-        initTrainingDisplay();
-        sendLoadRun('overfit');
+        initRibbon();
+        if (/\b(overfit|overfitting|my model)\b/i.test(transcript)) {
+          sendLoadRun('overfit');
+        }
       }
       sendQuery(transcript);
     }
 
+    let autoChartsRequested = false;
+
+    function loadCharts() {
+      if (isMockMode()) return;
+      sendQuery('show EDA of all my columns');
+      vrUi.updateStatus('Loading charts…');
+    }
+
+    function bootstrapChartsOnce() {
+      if (autoChartsRequested || isMockMode()) return;
+      autoChartsRequested = true;
+      loadCharts();
+    }
+
     initScene();
+    setFrameUpdateCallback(updateXRInteractions);
 
     const vrUi = initVRUI(camera, renderer, {
       onMic: () => startListening(),
+      onLoadCharts: () => loadCharts(),
       onExit: () => {},
       onStatusChange: (setStatus) => onConnectionChange(setStatus),
     });
@@ -72,18 +92,35 @@
     initVoice(handleVoiceQuery);
     onMicStateChange((active) => vrUi.setMicListening(active));
 
+    onConnect(() => bootstrapChartsOnce());
+
     onXRSessionStart(() => {
-      if (shouldBootstrapData()) {
-        sendQuery('show EDA of all my columns');
-      }
-      vrUi.updateStatus('Look forward for charts · Mic below');
+      bootstrapChartsOnce();
+      vrUi.updateStatus('Look forward · Mic or Charts below');
     });
 
-    onMessage('panels', (msg) => renderPanels(msg));
+    onMessage('panels', (msg) => {
+      renderPanels(msg);
+      notifySceneObjectsChanged();
+      vrUi.updateStatus(`${msg.panels?.length ?? 0} charts loaded`);
+    });
     onMessage('highlight', (msg) => highlightTargets(msg.target_ids));
-    onMessage('scatter3d', (msg) => renderScatter(msg));
-    initTrainingDisplay();
-    onMessage('training_update', (msg) => showTrainingVerdict(msg));
+    onMessage('scatter3d', (msg) => {
+      renderScatter(msg);
+      notifySceneObjectsChanged();
+    });
+    initRibbon();
+
+    function handleTrainingUpdate(msg) {
+      if (readLosses(msg)) {
+        addTrainingStep(msg);
+      }
+      if (msg?.metrics && 'verdict_code' in msg.metrics) {
+        showTrainingVerdict(msg);
+      }
+    }
+
+    onMessage('training_update', handleTrainingUpdate);
     onMessage('speech', (msg) => speak(msg.text));
     onMessage('report', (msg) => {
       renderReport(msg);

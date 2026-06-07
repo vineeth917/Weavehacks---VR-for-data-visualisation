@@ -7,9 +7,14 @@ export let renderer;
 
 let onSessionStartCallback = null;
 let bootstrapped = false;
+let frameUpdateCallback = null;
 
 export function onXRSessionStart(fn) {
   onSessionStartCallback = fn;
+}
+
+export function setFrameUpdateCallback(fn) {
+  frameUpdateCallback = fn;
 }
 
 export function initScene() {
@@ -57,6 +62,7 @@ export function initScene() {
   }
 
   renderer.setAnimationLoop(() => {
+    frameUpdateCallback?.();
     renderer.render(scene, camera);
   });
 }
