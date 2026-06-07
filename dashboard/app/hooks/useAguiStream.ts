@@ -48,12 +48,15 @@ export function useAguiStream(backendUrl: string) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const esRef = useRef<EventSource | null>(null);
   const mockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mockFedRef = useRef(false);
 
   const pushEvent = useCallback((ev: AguiEvent) => {
     setEvents((prev) => [...prev, ev]);
   }, []);
 
   const startMockStream = useCallback(async () => {
+    if (mockFedRef.current) return;
+    mockFedRef.current = true;
     setStatus("mock");
     try {
       const res = await fetch("/mocks/agui-stream.json");
@@ -71,6 +74,7 @@ export function useAguiStream(backendUrl: string) {
   const replayMock = useCallback(() => {
     setEvents([]);
     eventCounter = 0;
+    mockFedRef.current = false;
     startMockStream();
   }, [startMockStream]);
 
@@ -117,7 +121,7 @@ export function useAguiStream(backendUrl: string) {
     es.onerror = () => {
       clearTimeout(timeout);
       es.close();
-      if (status !== "mock") startMockStream();
+      startMockStream();
     };
 
     return () => {
