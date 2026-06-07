@@ -224,6 +224,7 @@ AGUIEventName = Literal[
     "TOOL_CALL_END",
     "STATE_DELTA",
     "HANDOFF",
+    "AGENT_THINKING",
     "RUN_FINISHED",
     "CUSTOM",       # generic extension hook; A2UI envelopes ride here
     "USER_ACTION",  # client → server replay of an A2UI userAction

@@ -46,8 +46,8 @@ log = logging.getLogger("hololab.agents.training_monitor")
 # ---------------------------------------------------------------------------
 
 @weave.op()
-def op_get_run_history(run_id: str) -> dict[str, Any]:
-    return _get_run_history_impl(run_id)
+def op_get_run_history(run_id: str, session_id: str | None = None) -> dict[str, Any]:
+    return _get_run_history_impl(run_id, session_id=session_id)
 
 
 @weave.op()
@@ -71,7 +71,7 @@ async def get_run_history_tool(ctx: RunContextWrapper[OrchestratorContext],
     LLM context small. The full metrics list is still cached in the session.
     """
     rid = run_id or ctx.context.active_run_id or get_active_run(ctx.context.session_id)
-    h = op_get_run_history(rid)
+    h = op_get_run_history(rid, session_id=ctx.context.session_id)
     # cache full history into Redis scratch for follow-up tool calls
     redis_state.set_scratch(ctx.context.session_id, "training_run", h)
     # remember this run as the active one in the session

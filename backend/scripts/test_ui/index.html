@@ -117,6 +117,45 @@
     <button onclick="loadDataset('sample')">load sample.csv</button>
   </div>
 
+  <h2>voice_query: problem type</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="askProblemType()">what problem?</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Loads nothing extra — run <b>load titanic</b> first. Routes to
+    <code>problem_type</code> and returns a <code>speech</code> frame.
+  </div>
+
+  <h2>voice_query: preprocessor</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="cleanData()">clean data</button>
+    <button onclick="readyToTrain()">ready to train?</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Requires <code>ENABLE_PREPROCESSOR=1</code> on the server. Run
+    <b>load sample</b> first. Returns <code>speech</code> + updated
+    <code>panels</code> on the versioned copy (v0 preserved).
+  </div>
+
+  <h2>voice_query: trainer</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="trainModel()">train model</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Requires <code>ENABLE_TRAINER=1</code> and cleaned data. Streams real per-epoch
+    <code>training_update</code> frames (train/val loss) then speech.
+  </div>
+
+  <h2>voice_query: evals</h2>
+  <div class="btn-bar">
+    <button class="primary" onclick="runEvals()">run evals</button>
+  </div>
+  <div style="margin-top:4px; color:var(--muted); font-size:11px">
+    Requires <code>ENABLE_EVALS=1</code> and cleaned data (<b>load sample</b> +
+    <b>clean data</b> first). Returns <code>speech</code> + confusion-matrix
+    <code>panels</code> from a real sklearn test split.
+  </div>
+
   <h2>command: load_run</h2>
   <div class="btn-bar">
     <button onclick="loadRun('demo-overfit-001')">overfit</button>
@@ -164,6 +203,8 @@
   <h2 style="margin-top:18px">tips</h2>
   <div style="color:var(--muted); font-size:11px; line-height:1.5">
     EDA queries → router picks <code>eda</code><br>
+    "what problem are we solving?" → <code>problem_type</code><br>
+    <code>ENABLE_PREPROCESSOR=1</code>: clean data / ready to train → <code>preprocessor</code><br>
     "is my model overfitting?" → <code>training_monitor</code><br>
     Click <b>load_run</b> first if you want a non-default run<br>
     Click <b>load_dataset</b> if you want sample.csv instead of titanic<br>
@@ -290,6 +331,41 @@ function sendVoiceQuery() {
   makeEv("wsList", "agent_status", "→ voice_query", text);
 }
 
+function askProblemType() {
+  const text = "what problem are we solving?";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (problem_type)", text);
+}
+
+function cleanData() {
+  const text = "remove nulls and duplicates and log-transform the skewed columns";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (preprocessor clean)", text);
+}
+
+function readyToTrain() {
+  const text = "is my data ready to train?";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (preprocessor ready?)", text);
+}
+
+function trainModel() {
+  const text = "train the model";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (trainer)", text);
+}
+
+function runEvals() {
+  const text = "run the evals";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (evals)", text);
+}
+
 function loadDataset(name) {
   send({type:"command", action:"load_dataset", params:{name}});
   makeEv("wsList", "agent_status", "→ load_dataset", name);
@@ -405,36 +481,62 @@ function renderWsFrame(msg) {
 
 // ---------- EventSource (/agui) ----------
 let es = null;
+let sseRetryTimer = null;
+let sseEverConnected = false;
+
 function connectSse() {
+  if (es) { try { es.close(); } catch (_) {} es = null; }
   setSseState("connecting…", "warn");
   es = new EventSource(sseUrl);
-  es.onopen = () => setSseState("open", "ok");
-  es.onerror = () => setSseState("error (retrying)", "bad");
 
-  // Generic listener: catch all named SSE events. We need explicit listeners
-  // because EventSource only routes `event: NAME` lines via addEventListener.
+  es.onopen = () => {
+    setSseState("open", "ok");
+    if (!sseEverConnected) {
+      sseEverConnected = true;
+      makeEv("sseList", "agent_thinking", "agui connected",
+        "listening — HANDOFF / CUSTOM A2UI / USER_ACTION appear here\n" +
+        "(server replays last ~64 events on connect)");
+    }
+  };
+  es.onerror = () => {
+    setSseState("error (retrying)", "bad");
+    if (sseRetryTimer) return;
+    sseRetryTimer = setTimeout(() => {
+      sseRetryTimer = null;
+      connectSse();
+    }, 2000);
+  };
+
+  // EventSource only routes `event: NAME` lines via addEventListener — register
+  // every AG-UI name plus onmessage as fallback. routeSse() uses data.event
+  // from the JSON body as the source of truth when wire name differs.
   const EVENT_NAMES = [
-    "STATE_DELTA", "HANDOFF", "USER_ACTION", "CUSTOM",
+    "STATE_DELTA", "HANDOFF", "USER_ACTION", "CUSTOM", "AGENT_THINKING",
     "RUN_STARTED", "RUN_FINISHED", "TEXT_MESSAGE_CONTENT",
     "TOOL_CALL_START", "TOOL_CALL_END",
-    "AGENT_THINKING",
   ];
-  EVENT_NAMES.forEach(name => {
-    es.addEventListener(name, (e) => routeSse(name, e));
-  });
-  // unnamed messages fall back to onmessage
-  es.onmessage = (e) => routeSse("message", e);
+  const handler = (e) => routeSse(e.type || "message", e);
+  EVENT_NAMES.forEach(name => es.addEventListener(name, handler));
+  es.onmessage = handler;
 }
 
-function routeSse(eventName, e) {
+function _a2uiSurfaceId(v) {
+  const env = v.surfaceUpdate || v.dataModelUpdate || v.beginRendering
+    || v.updateComponents || v.updateDataModel || v.createSurface || {};
+  return env.surfaceId || "?";
+}
+
+function routeSse(wireName, e) {
   let data;
   try { data = JSON.parse(e.data); }
   catch (err) { makeEv("sseList", "error", "bad sse json", e.data); return; }
 
-  // first message gives us the contracts version
+  // JSON payload is authoritative — fixes CUSTOM-wrapped AGENT_THINKING etc.
+  const eventName = data.event || wireName;
+
   if (eventName === "STATE_DELTA" && data.args && data.args.contracts_version) {
     document.getElementById("contractsV").textContent = data.args.contracts_version;
-    return; // don't spam the log with every heartbeat
+    return;
   }
   if (eventName === "STATE_DELTA") return; // heartbeats — silent
 
@@ -465,10 +567,9 @@ function routeSse(eventName, e) {
   }
 
   if (eventName === "CUSTOM") {
-    // A2UI envelope rides as CUSTOM
     const name = data.name || "(no name)";
     const v = data.value || {};
-    const surfaceId = (v.surfaceUpdate || v.dataModelUpdate || v.beginRendering || {}).surfaceId || "?";
+    const surfaceId = _a2uiSurfaceId(v);
     const body = document.createElement("div"); body.className = "body";
     body.textContent = name + "  surfaceId=" + surfaceId;
     body.appendChild(jsonDetails("A2UI " + name + " (envelope)", v));

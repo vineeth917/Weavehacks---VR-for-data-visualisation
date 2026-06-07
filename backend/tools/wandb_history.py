@@ -24,6 +24,7 @@ from typing import Any
 import weave
 
 from backend import config
+from backend.tools import redis_state
 
 log = logging.getLogger("hololab.tools.wandb_history")
 
@@ -110,17 +111,40 @@ def _from_wandb(run_id: str) -> dict[str, Any]:
     }
 
 
+_KNOWN_REPLAY = frozenset({
+    "demo-overfit-001", "demo-healthy-002", "demo-leakage-003",
+})
+
+
+def _session_trainer_run(session_id: str | None, run_id: str) -> dict[str, Any] | None:
+    """Return the real per-epoch series from trainer when present for this session."""
+    if not session_id:
+        return None
+    real = redis_state.get_scratch(session_id, "trainer_run")
+    if not real or not real.get("metrics"):
+        return None
+    real_id = real.get("run_id", "")
+    if run_id in _KNOWN_REPLAY and run_id != real_id:
+        return None
+    return real
+
+
 @weave.op()
 def get_run_history(run_id: str,
                     *,
+                    session_id: str | None = None,
                     replay_path: Path | None = None,
                     force_replay: bool = False) -> dict[str, Any]:
     """Return history for `run_id`.
 
-    Tries the W&B API when `run_id` looks like `entity/project/run` and a
-    `WANDB_API_KEY` is configured; otherwise (or on any error) falls back to
-    the local replay file at `data/replay_run_history.json`.
+    When `session_id` is set, prefers the real trainer run stored in Redis.
+    Otherwise tries the W&B API when `run_id` looks like `entity/project/run`
+    and a `WANDB_API_KEY` is configured; on failure falls back to replay.
     """
+    real = _session_trainer_run(session_id, run_id)
+    if real is not None:
+        return real
+
     path = replay_path or REPLAY_DEFAULT
     if force_replay:
         return _from_replay(run_id, path)

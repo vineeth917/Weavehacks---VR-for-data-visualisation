@@ -45,7 +45,8 @@ sys.path.insert(0, str(ROOT))
 WS_URL = "ws://127.0.0.1:8080/ws"
 HEALTH_URL = "http://127.0.0.1:8080/healthz"
 AGUI_URL = "http://127.0.0.1:8080/agui"
-ACTION_URL = "http://127.0.0.1:8080/action"
+ACTION_URL      = "http://127.0.0.1:8080/action"
+AGUI_ACTION_URL = "http://127.0.0.1:8080/agui/action"
 SID = f"narr-{int(time.time())}"
 
 FAILURES: list[str] = []
@@ -345,6 +346,38 @@ async def n8_button_modes_and_action_endpoint() -> None:
     (_ok if _is_user_action_for("confirm_transform", sse_events) else _bad)(
         f"USER_ACTION emitted on /agui after POST /action "
         f"(events seen: {[e.get('event') for e in sse_events]})")
+
+    # --- POST /agui/action accepts Person C's canonical {userAction:{...}} shape ---
+    sse_task2 = asyncio.create_task(sse_until(
+        lambda evs: _is_user_action_for("dismiss", evs),
+        timeout=15.0,
+    ))
+    await asyncio.sleep(0.2)
+    person_c_payload = {
+        "session_id": SID,
+        "userAction": {
+            "name": "dismiss",
+            "surfaceId": "eda-action",
+            "context": {"column": "fare"},
+        },
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(AGUI_ACTION_URL, json=person_c_payload)
+    (_ok if resp.status_code == 200 else _bad)(
+        f"POST /agui/action returned 200 (got {resp.status_code}, body={resp.text[:200]!r})")
+    body = resp.json() if resp.status_code == 200 else {}
+    iact = body.get("interaction") or {}
+    (_ok if iact.get("action") == "dismiss"
+          and iact.get("target_id") == "eda-action"
+          and iact.get("context", {}).get("column") == "fare" else _bad)(
+        f"POST /agui/action normalises {{userAction:{{...}}}} to Interaction (got {iact})")
+
+    sse_events2 = await asyncio.wait_for(sse_task2, timeout=15.0)
+    ua_via = next(((e.get("args") or {}).get("via") for e in sse_events2
+                   if e.get("event") == "USER_ACTION"
+                   and (e.get("args") or {}).get("action") == "dismiss"), None)
+    (_ok if ua_via == "POST /agui/action" else _bad)(
+        f"USER_ACTION via='POST /agui/action' on /agui (got via={ua_via!r})")
 
 
 # ---------------------------------------------------------------------------

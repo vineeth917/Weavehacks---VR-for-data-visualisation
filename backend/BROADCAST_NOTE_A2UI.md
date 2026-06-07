@@ -117,55 +117,90 @@ backend env and restart `uvicorn`. The action *string names* (the four
 frozen `ACTIONS`: `confirm_transform`, `dismiss`, `stop_training`,
 `keep_training`) are unchanged in both modes.
 
-### What backend ACCEPTS as a callback (both shapes work today)
+### What backend ACCEPTS as a callback
 
 When the user clicks an A2UI button, the renderer dispatches a
-client→server payload. Backend handles **three** shapes interchangeably:
+client→server payload. Backend handles **four** shapes interchangeably,
+all routed through `_handle_user_action()` — single source of truth, so
+emit-the-same-shape-everywhere is guaranteed.
 
-1. **v0.8 mirror over WebSocket** (`/ws`) — the `UserAction` contract:
-   ```json
-   {
-     "type": "user_action",
-     "session_id": "...",
-     "surface_id": "eda-action",
-     "action":     "confirm_transform",
-     "context":    { "column": "fare", "transform": "log" }
-   }
-   ```
+#### A. `POST /agui/action`  ← **CANONICAL FOR PERSON C**
 
-2. **Native `interaction` over WebSocket** (`/ws`) — what the VR client
-   already uses, identical payload shape but `type: "interaction"`.
+This is the path Person C's `@copilotkit/a2ui-renderer` dispatches to.
+Body shape (v0.8 `userAction` envelope):
 
-3. **v0.9 HTTP POST** (`/action`, new in this phase) — for HTTP-only
-   dashboards or A2UI renderers that prefer not to hold a WebSocket open
-   for callbacks. Accepts the v0.9 canonical payload directly:
-   ```json
-   POST /action
-   {
-     "session_id": "...",
-     "action": {
-       "name":              "confirm_transform",
-       "surfaceId":         "eda-action",
-       "sourceComponentId": "confirm",
-       "timestamp":         "2026-06-06T17:00:00Z",
-       "context":           { "column": "fare", "transform": "log" }
-     }
-   }
-   ```
-   Backend normalises this to an internal `Interaction` and emits a
-   `USER_ACTION` on `/agui` so the round-trip is visible in traces.
+```json
+POST /agui/action
+Content-Type: application/json
+{
+  "session_id": "<sid>",
+  "userAction": {
+    "name":      "confirm_transform",
+    "surfaceId": "eda-action",
+    "context":   { "column": "fare", "transform": "log" }
+  }
+}
+```
+
+Response: `200 {"ok": true, "interaction": {...}}`. Backend also
+immediately fans out a `USER_ACTION` event on `/agui` with
+`args.via = "POST /agui/action"` so the dashboard / dev UI sees the
+round-trip without polling.
+
+This endpoint is **what to wire your renderer at**. Smoke-tested green
+end-to-end:
+
+```
+$ curl -s http://localhost:8080/agui/action -d '{
+    "session_id":"demo",
+    "userAction":{"name":"confirm_transform","surfaceId":"eda-action",
+                  "context":{"column":"fare","transform":"log"}}}'
+{"ok":true,"interaction":{...}}
+```
+
+#### B. `POST /action`
+
+Compatibility alias for /agui/action — accepts the exact same body and
+also accepts the v0.9 spec wrap `{"action": {"name": ..., ...}}`.
+Behaves identically.
+
+#### C. WebSocket `/ws` — `{"type":"user_action", ...}`
+
+V0.8 mirror, for clients that already hold a WebSocket open:
+
+```json
+{
+  "type":       "user_action",
+  "session_id": "...",
+  "surface_id": "eda-action",
+  "action":     "confirm_transform",
+  "context":    { "column": "fare", "transform": "log" }
+}
+```
+
+#### D. WebSocket `/ws` — `{"type":"interaction", ...}`
+
+Identical payload shape to (C) but `type: "interaction"` — what the VR
+client uses. All four shapes converge to the same emit code path.
 
 ### What we need from Person C (live test)
 
-Spin the renderer up against a backend running with `BUTTON_MODE=v08`
-first. If your button clicks reach `/agui` as `USER_ACTION` events with
-the four frozen action names, **we're done** — keep v08.
+1. Point your renderer's action POST URL at `http://<backend>/agui/action`
+   (NOT `/action`; both work, but `/agui/action` is the documented one).
+2. Run with `BUTTON_MODE=v08` first (default — no env var needed). Click
+   any A2UI button.
+3. Confirm the dashboard sees a `USER_ACTION` event on `/agui` with
+   `args.action` set to one of the four frozen names
+   (`confirm_transform`, `dismiss`, `stop_training`, `keep_training`).
+4. If clicks do NOT round-trip, capture the HTTP body your renderer
+   posted (browser devtools network tab) and paste it into the shared
+   channel — we'll add a fifth compatibility shape rather than asking
+   you to change your renderer.
 
-If clicks DO NOT reach `/agui`, flip to `BUTTON_MODE=v09`, restart, and
-retry. If they still don't, capture the HTTP/WS payload your renderer
-*does* emit (browser devtools network tab) and paste it into the shared
-channel — we'll add a third compatibility shape rather than asking you to
-change your renderer.
+If you also want to test the v0.9 emit shape (action.event.name in the
+button component), restart backend with `A2UI_BUTTON_MODE=v09` and
+re-render. The callback path (POST /agui/action) is the same in both
+modes.
 
 **Do not mark this resolved on mocks.** It must be tested with the real
 `@copilotkit/a2ui-renderer v1.59.5` against a running `uvicorn`.

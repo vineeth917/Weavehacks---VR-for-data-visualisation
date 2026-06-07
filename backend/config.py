@@ -49,6 +49,9 @@ PORT = int(os.environ.get("PORT", "8080"))
 
 # --- safety flags ---
 USE_WEAVE = os.environ.get("USE_WEAVE", "1") not in ("0", "false", "False", "")
+ENABLE_PREPROCESSOR = os.environ.get("ENABLE_PREPROCESSOR", "") in ("1", "true", "True")
+ENABLE_EVALS = os.environ.get("ENABLE_EVALS", "") in ("1", "true", "True")
+ENABLE_TRAINER = os.environ.get("ENABLE_TRAINER", "") in ("1", "true", "True")
 
 
 def weave_project_full() -> str:
