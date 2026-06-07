@@ -3,7 +3,7 @@
     "version": "v0.9",
     "createSurface": {
       "surfaceId": "eda-findings",
-      "catalogId": "basic"
+      "catalogId": "https://a2ui.org/specification/v0_9/basic_catalog.json"
     }
   },
   {
@@ -38,7 +38,7 @@
     "version": "v0.9",
     "createSurface": {
       "surfaceId": "eda-action",
-      "catalogId": "basic"
+      "catalogId": "https://a2ui.org/specification/v0_9/basic_catalog.json"
     }
   },
   {
@@ -71,7 +71,7 @@
     "version": "v0.9",
     "createSurface": {
       "surfaceId": "training-verdict",
-      "catalogId": "basic"
+      "catalogId": "https://a2ui.org/specification/v0_9/basic_catalog.json"
     }
   },
   {

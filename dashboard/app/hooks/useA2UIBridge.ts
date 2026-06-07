@@ -17,7 +17,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useA2UIActions } from "@copilotkit/a2ui-renderer";
 
 const SESSION_ID = "demo-session-1";
-const CATALOG_ID = "basic";
+const CATALOG_ID = "https://a2ui.org/specification/v0_9/basic_catalog.json";
 
 // ---------------------------------------------------------------------------
 // v0.8 → v0.9 data-model decoder
