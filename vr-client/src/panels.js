@@ -51,6 +51,10 @@ function disposePanelMesh(id) {
   delete panelMeshes[id];
 }
 
+export function getPanelMesh(id) {
+  return panelMeshes[id] ?? null;
+}
+
 export function renderPanels(msg) {
   clearPanels();
 
@@ -73,6 +77,10 @@ export function renderPanels(msg) {
 
     mesh.position.set(x, y, z);
     mesh.lookAt(0, 1.6, 0);
+
+    mesh.userData.interactable = true;
+    mesh.userData.kind = 'panel';
+    mesh.userData.id = panel.id;
 
     scene.add(mesh);
     panelMeshes[panel.id] = mesh;

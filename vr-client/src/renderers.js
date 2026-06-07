@@ -60,6 +60,10 @@ export function renderKDESurface(msg) {
   kdeMesh.position.set(2, 1.0, -2);
   kdeMesh.rotation.x = -Math.PI / 2;
 
+  kdeMesh.userData.interactable = true;
+  kdeMesh.userData.kind = 'kde';
+  kdeMesh.userData.id = msg.id || 'kde_surface';
+
   scene.add(kdeMesh);
 }
 
@@ -87,6 +91,10 @@ export function renderCorrField(msg) {
         height / 2,
         j * 0.12
       );
+
+      bar.userData.interactable = true;
+      bar.userData.kind = 'corr';
+      bar.userData.id = `corr_${labels[i]}_${labels[j]}`;
 
       corrGroup.add(bar);
     }

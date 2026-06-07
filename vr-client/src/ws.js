@@ -5,6 +5,7 @@ const RECONNECT_DELAY_MS = 3000;
 const handlers = {};
 let ws = null;
 let reconnectTimer = null;
+let mockResponses = null;
 
 const mockMode = new URLSearchParams(window.location.search).get('mock') === '1';
 
@@ -47,6 +48,80 @@ export function sendCommand(action, params = {}) {
     params,
     session_id: SESSION_ID,
   });
+}
+
+export function sendInteraction(action, fields = {}) {
+  const payload = {
+    type: 'interaction',
+    action,
+    session_id: SESSION_ID,
+    ...fields,
+  };
+
+  send(payload);
+
+  if (mockMode) {
+    simulateInteractionResponse(payload);
+  }
+}
+
+function substitute(template, vars) {
+  if (Array.isArray(template)) {
+    return template.map((item) => substitute(item, vars));
+  }
+  if (template && typeof template === 'object') {
+    const result = {};
+    for (const [key, value] of Object.entries(template)) {
+      result[key] = substitute(value, vars);
+    }
+    return result;
+  }
+  if (typeof template === 'string') {
+    const fullMatch = template.match(/^\{(\w+)\}$/);
+    if (fullMatch) {
+      const value = vars[fullMatch[1]];
+      if (value !== undefined) return value;
+    }
+    return template.replace(/\{(\w+)\}/g, (_, key) => {
+      const value = vars[key];
+      return value !== undefined ? String(value) : `{${key}}`;
+    });
+  }
+  return template;
+}
+
+async function simulateInteractionResponse(payload) {
+  if (!mockResponses) {
+    try {
+      const resp = await fetch('/mocks/interaction_responses.json');
+      mockResponses = await resp.json();
+    } catch (err) {
+      console.error('Failed to load interaction_responses mock', err);
+      return;
+    }
+  }
+
+  const { action, target_id, point_ids } = payload;
+  const templateKey = action === 'select_point' && target_id && !target_id.startsWith('r')
+    ? 'select_panel'
+    : action;
+
+  const sequence = mockResponses[templateKey] || mockResponses[action];
+  if (!sequence) return;
+
+  const vars = {
+    target_id: target_id ?? '',
+    point_ids: point_ids ?? [],
+    count: point_ids?.length ?? 0,
+  };
+
+  for (let i = 0; i < sequence.length; i++) {
+    if (i > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    const msg = substitute(sequence[i], vars);
+    dispatchMessage(msg);
+  }
 }
 
 function scheduleReconnect() {
@@ -128,6 +203,26 @@ async function runMockMode() {
       console.error('Failed to load training_updates mock', err);
     }
   }, 3000);
+
+  setTimeout(async () => {
+    try {
+      const resp = await fetch('/mocks/kde_surface.json');
+      const data = await resp.json();
+      dispatchMessage(normalizeMessage(data, 'kde_surface'));
+    } catch (err) {
+      console.error('Failed to load kde_surface mock', err);
+    }
+  }, 5000);
+
+  setTimeout(async () => {
+    try {
+      const resp = await fetch('/mocks/corr_field.json');
+      const data = await resp.json();
+      dispatchMessage(normalizeMessage(data, 'corr_field'));
+    } catch (err) {
+      console.error('Failed to load corr_field mock', err);
+    }
+  }, 6000);
 }
 
 if (mockMode) {

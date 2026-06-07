@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { scene, camera, renderer } from './scene.js';
-import { sendCommand } from './ws.js';
+import { scene } from './scene.js';
 
 let scatterGroup = null;
+const pointMeshes = {};
 
 function createAxisLine(from, to, color) {
   const geometry = new THREE.BufferGeometry().setFromPoints([
@@ -54,42 +54,34 @@ function disposeScatterGroup(group) {
   });
 }
 
+export function getPointMesh(id) {
+  return pointMeshes[id] ?? null;
+}
+
+export function getPointMeshes() {
+  return Object.values(pointMeshes);
+}
+
+export function getNearbyPointIds(worldPos, radius) {
+  const ids = [];
+
+  for (const [id, mesh] of Object.entries(pointMeshes)) {
+    const pos = new THREE.Vector3();
+    mesh.getWorldPosition(pos);
+    if (pos.distanceTo(worldPos) <= radius) {
+      ids.push(id);
+    }
+  }
+
+  return ids;
+}
+
 export function clearScatter() {
   if (scatterGroup) {
     disposeScatterGroup(scatterGroup);
     scatterGroup = null;
   }
-}
-
-export function initInteractions(camera, renderer) {
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2();
-
-  renderer.domElement.addEventListener('click', (event) => {
-    if (!scatterGroup) return;
-
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-
-    const meshes = scatterGroup.children.filter((child) => child instanceof THREE.Mesh);
-    const intersects = raycaster.intersectObjects(meshes);
-
-    if (intersects.length > 0) {
-      const { label, id } = intersects[0].object.userData;
-      const targetId = id || label;
-
-      sendCommand('interaction', {
-        type: 'interaction',
-        action: 'select_point',
-        target_id: targetId,
-        session_id: 's1',
-      });
-
-      console.log('Selected point:', { label, id: targetId });
-    }
-  });
+  Object.keys(pointMeshes).forEach((key) => delete pointMeshes[key]);
 }
 
 export function renderScatter(msg) {
@@ -109,9 +101,15 @@ export function renderScatter(msg) {
       point.y * 1.5,
       point.z * 1.5
     );
+
+    const id = point.id || point.label;
+    mesh.userData.interactable = true;
+    mesh.userData.kind = 'point';
+    mesh.userData.id = id;
     mesh.userData.label = point.label;
 
     scatterGroup.add(mesh);
+    pointMeshes[id] = mesh;
   });
 
   const axes = [
@@ -131,5 +129,4 @@ export function renderScatter(msg) {
   });
 
   scene.add(scatterGroup);
-  initInteractions(camera, renderer);
 }

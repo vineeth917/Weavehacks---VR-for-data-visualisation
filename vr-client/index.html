@@ -36,21 +36,21 @@
   <button id="mic-btn">Enable Mic</button>
 
   <script type="module">
-    import * as THREE from 'three';
-    import { VRButton } from 'https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/webxr/VRButton.js';
-    import { initScene } from './src/scene.js';
-    import { onMessage } from './src/ws.js';
-    import { sendQuery } from './src/ws.js';
-    import { renderPanels, highlightPanel } from './src/panels.js';
-    import { renderScatter, clearScatter, initInteractions } from './src/scatter3d.js';
-    import { initRibbon, addTrainingStep, clearRibbon } from './src/loss_ribbon.js';
-    import { initVoice, speak, stopSpeaking } from './src/voice.js';
-    import { renderKDESurface, renderCorrField, clearRenderers } from './src/renderers.js';
+    import { initScene, scene, camera, renderer } from './src/scene.js';
+    import { onMessage, sendQuery } from './src/ws.js';
+    import { renderPanels } from './src/panels.js';
+    import { renderScatter } from './src/scatter3d.js';
+    import { initRibbon, addTrainingStep } from './src/loss_ribbon.js';
+    import { initVoice, speak } from './src/voice.js';
+    import { renderKDESurface, renderCorrField } from './src/renderers.js';
+    import { highlightTargets } from './src/highlight.js';
+    import { initInteractions } from './src/interactions.js';
 
     initScene();
+    initInteractions(scene, camera, renderer);
 
     onMessage('panels', (msg) => renderPanels(msg));
-    onMessage('highlight', (msg) => highlightPanel(msg.target_ids));
+    onMessage('highlight', (msg) => highlightTargets(msg.target_ids));
     onMessage('scatter3d', (msg) => renderScatter(msg));
     initRibbon();
     onMessage('training_update', (msg) => addTrainingStep(msg));
