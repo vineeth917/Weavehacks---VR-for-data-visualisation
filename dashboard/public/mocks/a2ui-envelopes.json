@@ -11,10 +11,10 @@
     "updateComponents": {
       "surfaceId": "eda-findings",
       "components": [
-        { "id": "root",          "component": "Column",  "alignment": "start", "children": { "explicitList": ["title", "findings_list"] } },
-        { "id": "title",         "component": "Text",    "text": { "literalString": "EDA Findings" }, "usageHint": "h3" },
-        { "id": "findings_list", "component": "List",    "dataBinding": "/findings", "componentId": "finding_row" },
-        { "id": "finding_row",   "component": "Row",     "alignment": "spaceBetween", "children": { "explicitList": ["col_name", "col_flag"] } },
+        { "id": "root",          "component": "Column",  "alignment": "start",        "children": { "explicitList": ["title", "findings_list"] } },
+        { "id": "title",         "component": "Text",    "text": "EDA Findings",       "variant": "h3" },
+        { "id": "findings_list", "component": "List",    "dataBinding": "/findings",   "componentId": "finding_row" },
+        { "id": "finding_row",   "component": "Row",     "alignment": "spaceBetween",  "children": { "explicitList": ["col_name", "col_flag"] } },
         { "id": "col_name",      "component": "Text",    "text": { "path": "/column" } },
         { "id": "col_flag",      "component": "Text",    "text": { "path": "/flag" } }
       ]
@@ -46,13 +46,15 @@
     "updateComponents": {
       "surfaceId": "eda-action",
       "components": [
-        { "id": "root",      "component": "Card",   "child": "card_body" },
-        { "id": "card_body", "component": "Column", "alignment": "start", "children": { "explicitList": ["heading", "rationale", "buttons"] } },
-        { "id": "heading",   "component": "Text",   "text": { "path": "/prompt" },    "usageHint": "h3" },
-        { "id": "rationale", "component": "Text",   "text": { "path": "/rationale" } },
-        { "id": "buttons",   "component": "Row",    "alignment": "end", "children": { "explicitList": ["confirm", "dismiss"] } },
-        { "id": "confirm",   "component": "Button", "label": { "literalString": "Apply transform" }, "action": "confirm_transform", "variant": "primary" },
-        { "id": "dismiss",   "component": "Button", "label": { "literalString": "Not now" },         "action": "dismiss",            "variant": "secondary" }
+        { "id": "root",           "component": "Card",   "child": "card_body" },
+        { "id": "card_body",      "component": "Column", "alignment": "start", "children": { "explicitList": ["heading", "rationale", "buttons"] } },
+        { "id": "heading",        "component": "Text",   "text": { "path": "/prompt" },    "variant": "h3" },
+        { "id": "rationale",      "component": "Text",   "text": { "path": "/rationale" } },
+        { "id": "buttons",        "component": "Row",    "alignment": "end", "children": { "explicitList": ["confirm", "dismiss"] } },
+        { "id": "confirm_label",  "component": "Text",   "text": "Apply transform" },
+        { "id": "confirm",        "component": "Button", "child": "confirm_label", "variant": "primary",  "action": { "event": { "name": "confirm_transform", "context": { "column": "price", "transform": "log" } } } },
+        { "id": "dismiss_label",  "component": "Text",   "text": "Not now" },
+        { "id": "dismiss",        "component": "Button", "child": "dismiss_label",  "variant": "default", "action": { "event": { "name": "dismiss", "context": { "column": "price" } } } }
       ]
     }
   },
@@ -79,13 +81,15 @@
     "updateComponents": {
       "surfaceId": "training-verdict",
       "components": [
-        { "id": "root",      "component": "Card",   "child": "card_body" },
-        { "id": "card_body", "component": "Column", "alignment": "start", "children": { "explicitList": ["heading", "reason", "buttons"] } },
-        { "id": "heading",   "component": "Text",   "text": { "path": "/heading" }, "usageHint": "h3" },
-        { "id": "reason",    "component": "Text",   "text": { "path": "/reason" } },
-        { "id": "buttons",   "component": "Row",    "alignment": "end", "children": { "explicitList": ["stop", "keep"] } },
-        { "id": "stop", "component": "Button", "label": { "literalString": "Stop training" }, "action": "stop_training",  "variant": "primary" },
-        { "id": "keep", "component": "Button", "label": { "literalString": "Keep going" },    "action": "keep_training",  "variant": "secondary" }
+        { "id": "root",        "component": "Card",   "child": "card_body" },
+        { "id": "card_body",   "component": "Column", "alignment": "start", "children": { "explicitList": ["heading", "reason", "buttons"] } },
+        { "id": "heading",     "component": "Text",   "text": { "path": "/heading" }, "variant": "h3" },
+        { "id": "reason",      "component": "Text",   "text": { "path": "/reason" } },
+        { "id": "buttons",     "component": "Row",    "alignment": "end", "children": { "explicitList": ["stop", "keep"] } },
+        { "id": "stop_label",  "component": "Text",   "text": "Stop training" },
+        { "id": "stop",        "component": "Button", "child": "stop_label", "variant": "primary",  "action": { "event": { "name": "stop_training",  "context": { "run_id": "demo-overfit-001", "step": 350, "verdict": "overfitting" } } } },
+        { "id": "keep_label",  "component": "Text",   "text": "Keep going" },
+        { "id": "keep",        "component": "Button", "child": "keep_label",  "variant": "default", "action": { "event": { "name": "keep_training",  "context": { "run_id": "demo-overfit-001", "step": 350, "verdict": "overfitting" } } } }
       ]
     }
   },

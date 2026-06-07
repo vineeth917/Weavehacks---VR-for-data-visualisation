@@ -53,15 +53,76 @@ function decodeV08Contents(contents: V08Entry[]): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// v0.8 component shape: { id, component: { "Text": { text: ... } } }
-// v0.9 component shape: { id, component: "Text", text: ... }
+// DynamicString translator: v0.8 {literalString:"x"} | {path:"/x"} → v0.9 "x" | {path:"/x"}
 // ---------------------------------------------------------------------------
-function translateComponent(c: Record<string, unknown>): Record<string, unknown> {
-  const { id, component } = c as { id: string; component: Record<string, unknown> };
-  if (!component || typeof component !== "object") return c;
-  const [typeName, props] = Object.entries(component)[0] ?? [];
-  if (!typeName) return c;
-  return { id, component: typeName, ...(props as Record<string, unknown>) };
+function translateDynamicString(v: unknown): unknown {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    if ("literalString" in obj) return obj.literalString;
+    if ("path" in obj) return { path: obj.path };
+  }
+  return v;
+}
+
+// ---------------------------------------------------------------------------
+// v0.8 component shape → v0.9 component shape
+// v0.8: { id, component: { "Text": { text: {literalString:"x"}, usageHint:"h3" } } }
+// v0.9: { id, component: "Text", text: "x", variant: "h3" }
+// Button v0.8: { label:{literalString:"x"}, action:"name", variant:"primary" }
+// Button v0.9: needs child Text component + action:{event:{name:"..."}}
+// ---------------------------------------------------------------------------
+const _buttonLabels: Map<string, string> = new Map(); // id → label text
+
+function translateComponent(c: Record<string, unknown>): Record<string, unknown>[] {
+  const raw = c as { id: string; component: Record<string, unknown> };
+  const { id } = raw;
+  const component = raw.component;
+  if (!component || typeof component !== "object") return [c];
+
+  const [typeName, propsRaw] = Object.entries(component)[0] ?? [];
+  if (!typeName) return [c];
+  const props = propsRaw as Record<string, unknown>;
+
+  // Translate Text: usageHint→variant, text DynamicString
+  if (typeName === "Text") {
+    return [{
+      id,
+      component: "Text",
+      text: translateDynamicString(props.text),
+      ...(props.usageHint ? { variant: props.usageHint } : {}),
+    }];
+  }
+
+  // Translate Button: label→child Text component, action string→action.event
+  if (typeName === "Button") {
+    const labelText = translateDynamicString(props.label) ?? "";
+    const labelId = `${id}_label`;
+    _buttonLabels.set(id, String(labelText));
+
+    // Build v0.9 action
+    let action: unknown = props.action;
+    if (typeof action === "string") {
+      action = { event: { name: action } };
+    }
+
+    const btn: Record<string, unknown> = {
+      id,
+      component: "Button",
+      child: labelId,
+      action,
+      ...(props.variant ? { variant: props.variant } : {}),
+    };
+    const labelComp: Record<string, unknown> = {
+      id: labelId,
+      component: "Text",
+      text: String(labelText),
+    };
+    return [labelComp, btn];
+  }
+
+  // Default: flatten component props
+  return [{ id, component: typeName, ...props }];
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +149,7 @@ function translateV08ToV09(envelope: Record<string, unknown>): Record<string, un
       version: "v0.9",
       updateComponents: {
         surfaceId: su.surfaceId,
-        components: su.components.map(translateComponent),
+        components: su.components.flatMap(translateComponent),
       },
     });
     return msgs;
