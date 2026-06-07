@@ -329,8 +329,15 @@ async def route(sid: str, text: str, ctx: OrchestratorContext) -> RouterResult:
         return RouterResult(target=target, narrator=_parse_narr(raw))
     elif target == "problem_type":
         return RouterResult(target=target, problem_type=_parse_pt(raw))
-    elif target == "preprocessor":
-        return RouterResult(target=target, preprocessor=_parse_pp(raw, ctx))
+    elif target == "preprocessor" and config.ENABLE_PREPROCESSOR:
+        from backend.agents import dataset_versions as _dv
+        out = await preprocessor_agent_mod.run_for_query(
+            sid, text, ctx.df, ctx.dataset_name,
+        )
+        working = _dv.get_working(sid)
+        if working:
+            ctx.df = working[2]
+        return RouterResult(target="preprocessor", preprocessor=out)
     elif target == "evals" and config.ENABLE_EVALS:
         out = await evals_agent_mod.run_for_query(sid, text, ctx.df, ctx.dataset_name)
         return RouterResult(target="evals", evals=out)

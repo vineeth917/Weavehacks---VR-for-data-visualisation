@@ -33,7 +33,7 @@ from backend.agents.parse import parse_json_object
 log = logging.getLogger("hololab.agents.problem_type")
 
 _TARGET_NAMES = frozenset({
-    "target", "label", "y", "class", "category", "survived", "outcome",
+    "target", "label", "y", "class", "category", "survived", "outcome", "mpg",
 })
 
 ProblemKind = Literal["classification", "regression", "unknown"]
