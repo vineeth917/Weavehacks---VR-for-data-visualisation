@@ -20,7 +20,7 @@
   .dot.ok{background:var(--good);} .dot.bad{background:var(--bad);} .dot.warn{background:var(--warn);}
 
   main{display:grid; grid-template-columns: 360px 1fr 1fr; gap:0;
-    height: calc(100vh - 48px);}
+    height: calc(100vh - 120px);}
   section{border-right:1px solid var(--border); overflow:auto; padding:10px 12px;}
   section:last-child{border-right:0;}
   section h2{font-size:11px; color:var(--muted); margin:8px 0 6px;
@@ -85,6 +85,22 @@
   .btn-bar{display:flex; gap:4px; flex-wrap:wrap;}
   .clear-btn{background:transparent; border:none; color:var(--muted); cursor:pointer;
     font-size:10px; text-decoration:underline;}
+
+  /* demo flow strip */
+  .demo-flow{background:var(--panel); border-bottom:1px solid var(--border);
+    padding:8px 14px;}
+  .demo-flow h2{font-size:11px; color:var(--muted); margin:0 0 6px;
+    text-transform:uppercase; letter-spacing:1px;}
+  .step-strip{display:flex; gap:4px; flex-wrap:wrap; align-items:center;}
+  .step-btn{background:#1a2030; border:1px solid var(--border); color:var(--muted);
+    border-radius:4px; padding:5px 8px; font-size:11px; cursor:pointer;
+    font-family:inherit; white-space:nowrap;}
+  .step-btn:hover{background:#252d42; color:var(--text);}
+  .step-btn.active{background:#1e3a5a; border-color:var(--accent); color:#cfe2ff;
+    box-shadow:0 0 0 1px #2b5184;}
+  .step-btn .num{color:var(--accent); font-weight:700; margin-right:4px;}
+  .demo-dataset{margin-top:6px; font-size:11px; color:var(--muted);}
+  .demo-dataset code{color:var(--text);}
 </style>
 </head>
 <body>
@@ -97,6 +113,28 @@
   <span style="flex:1"></span>
   <span class="meta">throwaway — backend/scripts/test_ui/index.html</span>
 </header>
+
+<div class="demo-flow">
+  <h2>demo flow (click through 1 → 9)</h2>
+  <div class="step-strip" id="stepStrip">
+    <button class="step-btn" data-step="1" onclick="runDemoStep(1)"><span class="num">1</span>Load</button>
+    <button class="step-btn" data-step="2" onclick="runDemoStep(2)"><span class="num">2</span>Problem?</button>
+    <button class="step-btn" data-step="3" onclick="runDemoStep(3)"><span class="num">3</span>EDA</button>
+    <button class="step-btn" data-step="4" onclick="runDemoStep(4)"><span class="num">4</span>Clean</button>
+    <button class="step-btn" data-step="5" onclick="runDemoStep(5)"><span class="num">5</span>EDA again</button>
+    <button class="step-btn" data-step="6" onclick="runDemoStep(6)"><span class="num">6</span>Ready/Train</button>
+    <button class="step-btn" data-step="7" onclick="runDemoStep(7)"><span class="num">7</span>Overfitting?</button>
+    <button class="step-btn" data-step="8" onclick="runDemoStep(8)"><span class="num">8</span>Evals</button>
+    <button class="step-btn" data-step="9" onclick="runDemoStep(9)"><span class="num">9</span>Narrate</button>
+  </div>
+  <div class="demo-dataset">
+    dataset for step 1:
+    <button onclick="setDemoDataset('titanic')">titanic</button>
+    <button onclick="setDemoDataset('mpg')">mpg</button>
+    <button onclick="setDemoDataset('sample')">sample</button>
+    — active: <code id="demoDatasetLabel">titanic</code>
+  </div>
+</div>
 
 <main>
 
@@ -114,6 +152,7 @@
   <h2>command: load_dataset</h2>
   <div class="btn-bar">
     <button onclick="loadDataset('titanic')">load titanic</button>
+    <button onclick="loadDataset('mpg')">load mpg</button>
     <button onclick="loadDataset('sample')">load sample.csv</button>
   </div>
 
@@ -129,12 +168,14 @@
   <h2>voice_query: preprocessor</h2>
   <div class="btn-bar">
     <button class="primary" onclick="cleanData()">clean data</button>
+    <button class="primary" onclick="makeReadyForTraining()">make ready for training</button>
     <button onclick="readyToTrain()">ready to train?</button>
   </div>
   <div style="margin-top:4px; color:var(--muted); font-size:11px">
-    Requires <code>ENABLE_PREPROCESSOR=1</code> on the server. Run
-    <b>load sample</b> first. Returns <code>speech</code> + updated
-    <code>panels</code> on the versioned copy (v0 preserved).
+    Requires <code>ENABLE_PREPROCESSOR=1</code>. <b>clean data</b> = impute nulls
+    (median/mode), log-skew, clip outliers. <b>make ready for training</b> =
+    split 75/25, encode, resample train, scale features. <b>ready to train?</b>
+    = read-only check on the stored train/val split.
   </div>
 
   <h2>voice_query: trainer</h2>
@@ -142,8 +183,8 @@
     <button class="primary" onclick="trainModel()">train model</button>
   </div>
   <div style="margin-top:4px; color:var(--muted); font-size:11px">
-    Requires <code>ENABLE_TRAINER=1</code> and cleaned data. Streams real per-epoch
-    <code>training_update</code> frames (train/val loss) then speech.
+    Requires <code>ENABLE_TRAINER=1</code> + make-ready split. Trains on the
+    preprocessor train split; streams <code>training_update</code> + W&B loss.
   </div>
 
   <h2>voice_query: evals</h2>
@@ -168,8 +209,8 @@
     <button class="primary" onclick="narrateSession()">📝 narrate session</button>
   </div>
   <div style="margin-top:4px; color:var(--muted); font-size:11px">
-    Reads accumulated EDA findings + active-run verdict from Redis, no
-    recomputation. Returns a <code>report</code> frame rendered below.
+    Brief wrap-up: dataset/problem, cleaning, make-ready split, training
+    loss, and evals — built from real session scratch (no recompute).
   </div>
 
   <h2>command: reset</h2>
@@ -246,6 +287,55 @@ const sseState = document.getElementById("sseState");
 
 let ws = null;
 let wsReady = false;
+let demoDataset = "titanic";
+let activeDemoStep = 0;
+
+function setDemoDataset(name) {
+  demoDataset = name;
+  document.getElementById("demoDatasetLabel").textContent = name;
+}
+
+function highlightDemoStep(n) {
+  activeDemoStep = n;
+  document.querySelectorAll(".step-btn").forEach((btn) => {
+    btn.classList.toggle("active", Number(btn.dataset.step) === n);
+  });
+}
+
+function runEdaQuery(label) {
+  const text = "which columns are skewed and is anything missing?";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (" + label + ")", text);
+}
+
+function askOverfitting() {
+  const text = "is my model overfitting?";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (training_monitor)", text);
+}
+
+function runDemoStep(n) {
+  highlightDemoStep(n);
+  if (n === 1) {
+    setDemoDataset(demoDataset);
+    loadDataset(demoDataset);
+    return;
+  }
+  if (n === 2) { askProblemType(); return; }
+  if (n === 3) { runEdaQuery("eda"); return; }
+  if (n === 4) { cleanData(); return; }
+  if (n === 5) { runEdaQuery("eda again"); return; }
+  if (n === 6) {
+    readyToTrain();
+    setTimeout(() => trainModel(), 1200);
+    return;
+  }
+  if (n === 7) { askOverfitting(); return; }
+  if (n === 8) { runEvals(); return; }
+  if (n === 9) { narrateSession(); return; }
+}
 
 function setWsState(label, cls) {
   wsState.textContent = label;
@@ -339,10 +429,17 @@ function askProblemType() {
 }
 
 function cleanData() {
-  const text = "remove nulls and duplicates and log-transform the skewed columns";
+  const text = "clean the data — impute nulls, log-transform skewed columns, and clip outliers";
   document.getElementById("vqText").value = text;
   send({type:"voice_query", text});
   makeEv("wsList", "agent_status", "→ voice_query (preprocessor clean)", text);
+}
+
+function makeReadyForTraining() {
+  const text = "make the data ready for training";
+  document.getElementById("vqText").value = text;
+  send({type:"voice_query", text});
+  makeEv("wsList", "agent_status", "→ voice_query (preprocessor full ready)", text);
 }
 
 function readyToTrain() {

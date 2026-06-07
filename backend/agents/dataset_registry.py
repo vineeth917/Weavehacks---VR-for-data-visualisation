@@ -5,6 +5,8 @@ Available datasets:
               and a trainable target ("survived").
     sample  : data/sample.csv — synthetic, planted issues (right_skewed, outliers,
               heavy_missing, near_constant, correlated pair). Used by Phase 1 test.
+    mpg     : seaborn.load_dataset("mpg") — 200×8 subset, continuous target ("mpg")
+              for regression demos (RMSE / scatter, SGDRegressor).
 
 The active dataset for a session is held in-process (cheap) and the dataset
 profile is mirrored to Redis per PLAN §6.5.
@@ -25,7 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SAMPLE_CSV = REPO_ROOT / "data" / "sample.csv"
 SEABORN_CACHE = REPO_ROOT / "data" / ".seaborn_cache"
 
-AVAILABLE = ("titanic", "sample")
+AVAILABLE = ("titanic", "sample", "mpg")
 DEFAULT = "titanic"
 
 _active: dict[str, tuple[str, pd.DataFrame]] = {}
@@ -63,7 +65,27 @@ def _load_sample() -> pd.DataFrame:
     return pd.read_csv(SAMPLE_CSV)
 
 
-_LOADERS = {"titanic": _load_titanic, "sample": _load_sample}
+_MPG_URL = "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/mpg.csv"
+_MPG_MAX_ROWS = 200
+
+
+def _load_mpg() -> pd.DataFrame:
+    """Load seaborn mpg with local cache; keep a small row cap for fast demos."""
+    SEABORN_CACHE.mkdir(parents=True, exist_ok=True)
+    cache_path = SEABORN_CACHE / "mpg.csv"
+    if not cache_path.exists():
+        import httpx
+        log.info("downloading mpg.csv -> %s", cache_path)
+        r = httpx.get(_MPG_URL, timeout=30.0)
+        r.raise_for_status()
+        cache_path.write_bytes(r.content)
+    df = pd.read_csv(cache_path)
+    if len(df) > _MPG_MAX_ROWS:
+        df = df.head(_MPG_MAX_ROWS).reset_index(drop=True)
+    return df
+
+
+_LOADERS = {"titanic": _load_titanic, "sample": _load_sample, "mpg": _load_mpg}
 
 
 def load(sid: str, name: str) -> pd.DataFrame:

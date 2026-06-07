@@ -19,6 +19,7 @@ from agents import Agent, ModelSettings, RunContextWrapper, Runner, function_too
 from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field, ValidationError
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 from backend import config
@@ -37,7 +38,7 @@ from backend.tools.profiling import profile_dataset as _profile_dataset_impl
 
 log = logging.getLogger("hololab.agents.preprocessor")
 
-_TARGET_NAMES = frozenset({"target", "label", "y", "survived", "class", "category"})
+_TARGET_NAMES = frozenset({"target", "label", "y", "survived", "class", "category", "mpg"})
 _MAX_SKEW = 1.0
 
 
@@ -69,7 +70,11 @@ def op_drop_nulls(df: pd.DataFrame, strategy: str = "drop_rows") -> tuple[pd.Dat
             else:
                 mode = out[col].mode()
                 out[col] = out[col].fillna(mode.iloc[0] if len(mode) else "")
-        return out, f"imputed nulls (median/mode) on {before} rows"
+        filled = int(out.isna().sum().sum())
+        return out, (
+            f"imputed nulls with median (numeric) and mode (categorical) "
+            f"— {before} rows kept, {filled} cells filled"
+        )
     out = df.dropna().reset_index(drop=True)
     dropped = before - len(out)
     return out, f"dropped {dropped} rows with nulls ({before} → {len(out)})"
@@ -120,7 +125,8 @@ def op_log_transform(df: pd.DataFrame, column: str) -> tuple[pd.DataFrame, str]:
 @weave.op()
 def op_scale(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     out = df.copy()
-    num_cols = [c for c in out.columns if _is_numeric(out[c])]
+    target = _target_column(out)
+    num_cols = [c for c in out.columns if _is_numeric(out[c]) and c != target]
     if not num_cols:
         return out, "no numeric columns to scale"
     scaler = StandardScaler()
@@ -130,11 +136,18 @@ def op_scale(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
 
 @weave.op()
 def op_one_hot_encode(df: pd.DataFrame) -> tuple[pd.DataFrame, str]:
-    cat_cols = [
-        c for c in df.columns
-        if not _is_numeric(df[c]) or df[c].dtype == object
-    ]
-    cat_cols = [c for c in cat_cols if df[c].nunique(dropna=True) <= 20]
+    target = _target_column(df)
+    cat_cols: list[str] = []
+    for c in df.columns:
+        if c == target:
+            continue
+        n_u = int(df[c].nunique(dropna=True))
+        if n_u > 20:
+            continue
+        if not _is_numeric(df[c]) or isinstance(df[c].dtype, object):
+            cat_cols.append(c)
+        elif pd.api.types.is_integer_dtype(df[c]) and n_u <= 20:
+            cat_cols.append(c)
     if not cat_cols:
         return df.copy(), "no low-cardinality categoricals to encode"
     out = pd.get_dummies(df, columns=cat_cols, drop_first=True)
@@ -184,6 +197,114 @@ def op_resample_balance(df: pd.DataFrame, target: str | None = None) -> tuple[pd
     return out, f"oversampled {col} toward balance (~{ratio_str})"
 
 
+def _df_to_blob(df: pd.DataFrame) -> dict[str, Any]:
+    return {"columns": [str(c) for c in df.columns], "records": df.to_dict(orient="records")}
+
+
+def _blob_to_df(blob: dict[str, Any]) -> pd.DataFrame:
+    return pd.DataFrame(blob.get("records") or [], columns=blob.get("columns") or [])
+
+
+def _save_train_val_split(
+    sid: str,
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    target: str,
+    version: int,
+) -> None:
+    scratch = dict(redis_state.get_scratch(sid, "preprocessor") or {})
+    scratch["split"] = {
+        "version": version,
+        "target": target,
+        "train_rows": len(train_df),
+        "val_rows": len(val_df),
+        "train": _df_to_blob(train_df),
+        "val": _df_to_blob(val_df),
+    }
+    redis_state.set_scratch(sid, "preprocessor", scratch)
+
+
+def get_train_val_split(sid: str, version: int | None = None) -> dict[str, Any] | None:
+    """Return stored train/val split if it matches the current dataset version."""
+    scratch = redis_state.get_scratch(sid, "preprocessor") or {}
+    split = scratch.get("split")
+    if not split:
+        return None
+    if version is not None and int(split.get("version", -1)) != int(version):
+        return None
+    return split
+
+
+@weave.op()
+def op_run_clean_pipeline(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Impute nulls, dedupe, log-transform skewed numerics, clip outliers."""
+    changes: list[str] = []
+    out, msg = op_drop_nulls(df, "impute_median")
+    changes.append(msg)
+    out, msg = op_drop_duplicates(out)
+    changes.append(msg)
+    prof = _profile_dataset_impl(out)
+    for col in prof.get("columns") or []:
+        flags = col.get("flags") or []
+        if "right_skewed" in flags or "left_skewed" in flags:
+            out, msg = op_log_transform(out, str(col["name"]))
+            changes.append(msg)
+    out, msg = op_clip_outliers(out)
+    changes.append(msg)
+    return out, changes
+
+
+@weave.op()
+def op_make_ready_for_training(sid: str, df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Split → encode → resample train → scale features; persist train/val in scratch."""
+    target = _target_column(df)
+    if target not in df.columns:
+        raise ValueError(f"target column {target!r} not found")
+
+    y = df[target]
+    stratify = y if y.nunique(dropna=True) > 1 and y.nunique(dropna=True) <= 20 else None
+    try:
+        train_df, val_df = train_test_split(
+            df, test_size=0.25, random_state=42, stratify=stratify,
+        )
+    except ValueError:
+        train_df, val_df = train_test_split(df, test_size=0.25, random_state=42)
+
+    changes: list[str] = [
+        f"split train={len(train_df)} val={len(val_df)} (75/25 stratified)",
+    ]
+
+    train_enc, enc_msg = op_one_hot_encode(train_df.reset_index(drop=True))
+    val_enc, _ = op_one_hot_encode(val_df.reset_index(drop=True))
+    val_enc = val_enc.reindex(columns=train_enc.columns, fill_value=0)
+    changes.append(enc_msg)
+
+    if op_check_imbalance(train_enc, target).get("imbalanced"):
+        train_enc, bal_msg = op_resample_balance(train_enc, target)
+        changes.append(bal_msg)
+    else:
+        changes.append(f"train split already balanced on {target}")
+
+    feat_cols = [c for c in train_enc.columns if c != target]
+    if not feat_cols:
+        raise ValueError("no feature columns after encoding")
+
+    scaler = StandardScaler()
+    train_feats = scaler.fit_transform(train_enc[feat_cols].astype(float))
+    val_feats = scaler.transform(val_enc[feat_cols].astype(float))
+    train_out = pd.DataFrame(train_feats, columns=feat_cols)
+    train_out[target] = train_enc[target].values
+    val_out = pd.DataFrame(val_feats, columns=feat_cols)
+    val_out[target] = val_enc[target].values
+    changes.append(f"standard-scaled {len(feat_cols)} feature column(s) (target untouched)")
+
+    ver = current_version(sid) or 0
+    _save_train_val_split(sid, train_out, val_out, target, ver)
+
+    combined = pd.concat([train_out, val_out], ignore_index=True)
+    return combined, changes
+
+
 @weave.op()
 def op_apply_plan(
     sid: str,
@@ -201,6 +322,14 @@ def op_apply_plan(
     for step in plan[:12]:
         op = str(step.get("op") or "")
         try:
+            if op == "clean_data":
+                working, step_changes = op_run_clean_pipeline(working)
+                changes.extend(step_changes)
+                continue
+            if op == "make_ready":
+                working, step_changes = op_make_ready_for_training(sid, working)
+                changes.extend(step_changes)
+                continue
             if op == "drop_nulls":
                 working, msg = op_drop_nulls(working, str(step.get("strategy") or "drop_rows"))
             elif op == "drop_duplicates":
@@ -239,6 +368,14 @@ def op_apply_plan(
 
     if changes:
         ver_after = save_new_version(sid, working, changes=changes)
+        scratch = dict(redis_state.get_scratch(sid, "preprocessor") or {})
+        if scratch.get("split") is not None:
+            scratch["split"] = dict(scratch["split"])
+            scratch["split"]["version"] = ver_after
+        pipeline_log = list(scratch.get("pipeline_log") or [])
+        pipeline_log.append({"version": ver_after, "changes": changes})
+        scratch["pipeline_log"] = pipeline_log
+        redis_state.set_scratch(sid, "preprocessor", scratch)
     else:
         ver_after = ver_before
 
@@ -255,34 +392,46 @@ def op_apply_plan(
 
 @weave.op()
 def op_check_readiness(sid: str, dataset_name: str, df: pd.DataFrame) -> dict[str, Any]:
-    """Read-only training-readiness report on the current version."""
+    """Read-only readiness on the preprocessor train/val split (post encode + scale)."""
     ensure_baseline(sid, dataset_name, df)
-    prof = _profile_dataset_impl(df)
+    ver = current_version(sid) or 0
     issues: list[str] = []
     skewed: list[str] = []
-    for col in prof.get("columns") or []:
-        if col.get("missing_pct", 0) > 0.5:
-            issues.append(f"{col['name']} still has {col['missing_pct']:.1f}% missing")
-        flags = col.get("flags") or []
-        if "right_skewed" in flags or "left_skewed" in flags:
-            skewed.append(col["name"])
-        if "heavy_missing" in flags:
-            issues.append(f"{col['name']} heavily missing ({col['missing_pct']:.0f}%)")
+    split = get_train_val_split(sid, ver)
+    train_rows = val_rows = 0
+    encoded = scaled = False
+    imb: dict[str, Any] = {}
 
-    imb = op_check_imbalance(df)
-    encoded = any("_" in c for c in df.columns)  # crude one-hot signal
-    scaled = False  # heuristic: mean near 0 for numerics after scale
-    num_cols = [c for c in df.columns if _is_numeric(df[c])]
-    if num_cols:
-        means = [abs(float(df[c].mean())) for c in num_cols[:5] if df[c].notna().any()]
-        scaled = bool(means) and max(means) < 0.5
+    if split is None:
+        issues.append("no train/val split — run make ready for training first")
+    else:
+        train_df = _blob_to_df(split["train"])
+        val_df = _blob_to_df(split["val"])
+        target = str(split.get("target") or _target_column(df))
+        train_rows = len(train_df)
+        val_rows = len(val_df)
 
-    if skewed:
-        issues.append(f"skewed columns remain: {', '.join(skewed[:4])}")
-    if imb.get("imbalanced"):
-        issues.append(
-            f"class imbalance on {imb.get('target')}: {imb.get('ratios')}"
-        )
+        if train_df.isna().any().any() or val_df.isna().any().any():
+            issues.append("missing values remain in train or val split")
+        if train_rows < 10:
+            issues.append(f"train split too small ({train_rows} rows)")
+
+        feat_cols = [c for c in train_df.columns if c != target]
+        encoded = any("_" in c for c in feat_cols) or len(feat_cols) > len(df.columns) - 1
+        if not encoded and len(feat_cols) <= 2:
+            issues.append("categoricals not encoded yet")
+
+        if feat_cols:
+            means = [abs(float(train_df[c].mean())) for c in feat_cols[:12] if train_df[c].notna().any()]
+            scaled = bool(means) and max(means) < 0.6
+            if not scaled:
+                issues.append("features not standard-scaled on train split")
+
+        imb = op_check_imbalance(train_df, target)
+        if imb.get("imbalanced"):
+            issues.append(
+                f"class imbalance on train {imb.get('target')}: {imb.get('ratios')}"
+            )
 
     ready = len(issues) == 0
     return {
@@ -293,8 +442,11 @@ def op_check_readiness(sid: str, dataset_name: str, df: pd.DataFrame) -> dict[st
         "imbalance": imb,
         "encoded": encoded,
         "scaled_hint": scaled,
+        "has_split": split is not None,
+        "train_rows": train_rows,
+        "val_rows": val_rows,
         "n_rows": len(df),
-        "version": current_version(sid) or 0,
+        "version": ver,
     }
 
 
@@ -579,39 +731,72 @@ def build_panel_specs_fallback(sid: str) -> list[PanelSpec]:
     return _panel_specs_from_profile(prof) if prof else []
 
 
-def _is_readiness_query(text: str) -> bool:
+def reset_preprocessor_scratch(sid: str) -> None:
+    """Clear preprocessor split metadata (on load_dataset / reset)."""
+    redis_state.set_scratch(sid, "preprocessor", {})
+
+
+def reset_readiness_attempts(sid: str) -> None:
+    """Backward-compatible alias."""
+    reset_preprocessor_scratch(sid)
+
+
+def _readiness_reasons(report: dict[str, Any]) -> str:
+    parts: list[str] = []
+    ver = report.get("version")
+    if report.get("has_split"):
+        parts.append(
+            f"train={report.get('train_rows')} val={report.get('val_rows')} at v{ver}"
+        )
+    if report.get("encoded"):
+        parts.append("categoricals encoded")
+    if report.get("scaled_hint"):
+        parts.append("features scaled")
+    imb = report.get("imbalance") or {}
+    if imb.get("target") and not imb.get("imbalanced"):
+        parts.append(f"balanced train target '{imb.get('target')}'")
+    issues = report.get("issues") or []
+    if not issues:
+        parts.append("no blocking issues")
+    return "; ".join(parts[:5])
+
+
+def _is_transform_ready_command(text: str) -> bool:
+    """Imperative cleanup — must mutate data, not the read-only readiness check."""
     t = text.lower()
-    return "ready" in t and ("train" in t or "training" in t)
+    return (
+        "make the data ready" in t
+        or "make it ready" in t
+        or ("prepare" in t and "ready" in t and ("train" in t or "training" in t))
+    )
 
 
-def _is_cleanup_query(text: str) -> bool:
+def _is_readiness_query(text: str) -> bool:
+    if _is_transform_ready_command(text):
+        return False
+    t = text.lower()
+    return "ready" in t and ("train" in t or "training" in t or "data" in t)
+
+
+def _is_make_ready_command(text: str) -> bool:
+    t = text.lower()
+    return (
+        "make the data ready" in t
+        or "make data ready" in t
+        or "make ready for training" in t
+        or ("make" in t and "ready" in t and ("train" in t or "training" in t))
+    )
+
+
+def _is_clean_query(text: str) -> bool:
+    if _is_make_ready_command(text) or _is_readiness_query(text):
+        return False
     t = text.lower()
     return any(k in t for k in (
-        "remove", "drop", "clean", "transform", "log", "null",
-        "duplicate", "skew", "preprocess", "make the data ready",
-        "ready for training",
+        "clean", "remove null", "drop null", "impute", "duplicate",
+        "log-transform", "log transform", "skew", "clip", "outlier",
+        "preprocess",
     ))
-
-
-def _build_cleanup_plan(df: pd.DataFrame, text: str) -> list[dict[str, Any]]:
-    prof = _profile_dataset_impl(df)
-    full = "ready for training" in text.lower() or "make the data ready" in text.lower()
-    plan: list[dict[str, Any]] = [
-        {"op": "drop_nulls"},
-        {"op": "drop_duplicates"},
-    ]
-    for col in prof.get("columns") or []:
-        flags = col.get("flags") or []
-        if "right_skewed" in flags or "left_skewed" in flags:
-            plan.append({"op": "log_transform", "column": col["name"]})
-    if full:
-        plan.append({"op": "clip_outliers"})
-        plan.append({"op": "scale"})
-        plan.append({"op": "one_hot_encode"})
-        imb = op_check_imbalance(df)
-        if imb.get("imbalanced"):
-            plan.append({"op": "resample_balance", "target": imb.get("target")})
-    return plan
 
 
 def _output_from_apply(sid: str, result: dict[str, Any]) -> PreprocessorOutput:
@@ -635,16 +820,17 @@ def _output_from_apply(sid: str, result: dict[str, Any]) -> PreprocessorOutput:
 def _output_from_readiness(sid: str, report: dict[str, Any]) -> PreprocessorOutput:
     ready = bool(report.get("ready"))
     issues = report.get("issues") or []
+    ver = int(report.get("version") or current_version(sid) or 0)
     if ready:
-        speech = "Your data looks ready to train on the current version."
+        speech = f"Your data is ready to train: {_readiness_reasons(report)}."
     else:
         speech = "Not ready to train yet: " + "; ".join(issues[:3])
     return PreprocessorOutput(
-        speech=speech[:300],
+        speech=speech[:400],
         mode="readiness",
         ready=ready,
-        version_before=int(report.get("version") or current_version(sid) or 0),
-        version_after=int(report.get("version") or current_version(sid) or 0),
+        version_before=ver,
+        version_after=ver,
         changes=[],
         panel_specs=_panel_specs_from_profile(redis_state.get_profile(sid) or {}),
     )
@@ -663,9 +849,12 @@ async def run_deterministic(sid: str, text: str, df: pd.DataFrame,
     if _is_readiness_query(text):
         return _output_from_readiness(sid, op_check_readiness(sid, dataset_name, df))
 
-    if _is_cleanup_query(text):
-        plan = _build_cleanup_plan(df, text)
-        result = op_apply_plan(sid, dataset_name, df, plan)
+    if _is_make_ready_command(text):
+        result = op_apply_plan(sid, dataset_name, df, [{"op": "make_ready"}])
+        return _output_from_apply(sid, result)
+
+    if _is_clean_query(text):
+        result = op_apply_plan(sid, dataset_name, df, [{"op": "clean_data"}])
         return _output_from_apply(sid, result)
 
     return None

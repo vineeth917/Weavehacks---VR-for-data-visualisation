@@ -774,6 +774,7 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
             df = await asyncio.to_thread(dataset_registry.load, sid, name)
             if config.ENABLE_PREPROCESSOR:
                 await asyncio.to_thread(dataset_versions.snapshot_v0, sid, name, df)
+                preprocessor_agent.reset_preprocessor_scratch(sid)
         except Exception as e:  # noqa: BLE001
             await ws.send_json(
                 AgentStatus(agent="router", state="error",
@@ -821,6 +822,8 @@ async def _handle_command(ws: WebSocket, msg: Command) -> None:
         dataset_registry.reset(sid)
         dataset_versions.clear_session(sid)
         run_registry.reset(sid)
+        if config.ENABLE_PREPROCESSOR:
+            preprocessor_agent.reset_preprocessor_scratch(sid)
         log.info("reset session=%s purged_keys=%d", sid, n)
 
     await ws.send_json(

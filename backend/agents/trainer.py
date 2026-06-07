@@ -25,6 +25,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from backend import config
 from backend.agents.context import OrchestratorContext
 from backend.agents.dataset_versions import current_version, get_working
+from backend.agents.preprocessor import get_train_val_split
 from backend.agents.parse import parse_json_object
 from backend.agents.problem_type import _pick_target_column
 from backend.agents import run_registry
@@ -193,8 +194,23 @@ def op_run_training(sid: str, dataset_name: str, df: pd.DataFrame | None) -> dic
         }
 
     try:
-        X, y = _encode_features(df, target_col)
-        X_train_arr, X_test_arr, y_train, y_test = _split_and_scale(X, y, problem_type)
+        split = get_train_val_split(sid, version) if config.ENABLE_PREPROCESSOR else None
+        if split is not None:
+            train_df = pd.DataFrame(
+                split["train"]["records"], columns=split["train"]["columns"],
+            )
+            val_df = pd.DataFrame(
+                split["val"]["records"], columns=split["val"]["columns"],
+            )
+            target_col = str(split.get("target") or target_col)
+            X_train_arr = train_df.drop(columns=[target_col]).astype(float).values
+            X_test_arr = val_df.drop(columns=[target_col]).astype(float).values
+            y_train = train_df[target_col]
+            y_test = val_df[target_col]
+            problem_type = _resolve_problem_type(sid, train_df, target_col)
+        else:
+            X, y = _encode_features(df, target_col)
+            X_train_arr, X_test_arr, y_train, y_test = _split_and_scale(X, y, problem_type)
     except Exception as e:  # noqa: BLE001
         return {"error": f"feature prep failed: {e}", "version": version}
 
