@@ -74,6 +74,14 @@ function translateDynamicString(v: unknown): unknown {
 // ---------------------------------------------------------------------------
 const _buttonLabels: Map<string, string> = new Map(); // id → label text
 
+// Translate v0.8 children {explicitList:[...]} → v0.9 plain array
+function translateChildren(children: unknown): unknown {
+  if (!children || typeof children !== "object") return children;
+  const ch = children as Record<string, unknown>;
+  if (Array.isArray(ch.explicitList)) return ch.explicitList;
+  return children;
+}
+
 function translateComponent(c: Record<string, unknown>): Record<string, unknown>[] {
   const raw = c as { id: string; component: Record<string, unknown> };
   const { id } = raw;
@@ -84,7 +92,6 @@ function translateComponent(c: Record<string, unknown>): Record<string, unknown>
   if (!typeName) return [c];
   const props = propsRaw as Record<string, unknown>;
 
-  // Translate Text: usageHint→variant, text DynamicString
   if (typeName === "Text") {
     return [{
       id,
@@ -94,34 +101,45 @@ function translateComponent(c: Record<string, unknown>): Record<string, unknown>
     }];
   }
 
-  // Translate Button: label→child Text component, action string→action.event
+  if (typeName === "Column" || typeName === "Row") {
+    return [{
+      id,
+      component: typeName,
+      children: translateChildren(props.children),
+      // alignment → justify
+      ...(props.alignment ? { justify: props.alignment } : {}),
+    }];
+  }
+
+  // List: dataBinding+componentId → children:{componentId, path}
+  if (typeName === "List") {
+    return [{
+      id,
+      component: "List",
+      children: props.dataBinding
+        ? { componentId: props.componentId, path: props.dataBinding }
+        : translateChildren(props.children),
+    }];
+  }
+
   if (typeName === "Button") {
     const labelText = translateDynamicString(props.label) ?? "";
     const labelId = `${id}_label`;
-    _buttonLabels.set(id, String(labelText));
-
-    // Build v0.9 action
     let action: unknown = props.action;
     if (typeof action === "string") {
       action = { event: { name: action } };
     }
-
-    const btn: Record<string, unknown> = {
-      id,
-      component: "Button",
-      child: labelId,
-      action,
-      ...(props.variant ? { variant: props.variant } : {}),
-    };
-    const labelComp: Record<string, unknown> = {
-      id: labelId,
-      component: "Text",
-      text: String(labelText),
-    };
-    return [labelComp, btn];
+    return [
+      { id: labelId, component: "Text", text: String(labelText) },
+      { id, component: "Button", child: labelId, action, ...(props.variant ? { variant: props.variant } : {}) },
+    ];
   }
 
-  // Default: flatten component props
+  if (typeName === "Card") {
+    return [{ id, component: "Card", child: props.child }];
+  }
+
+  // Default: flatten
   return [{ id, component: typeName, ...props }];
 }
 

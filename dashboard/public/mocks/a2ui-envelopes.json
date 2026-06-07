@@ -11,12 +11,12 @@
     "updateComponents": {
       "surfaceId": "eda-findings",
       "components": [
-        { "id": "root",          "component": "Column",  "alignment": "start",        "children": { "explicitList": ["title", "findings_list"] } },
-        { "id": "title",         "component": "Text",    "text": "EDA Findings",       "variant": "h3" },
-        { "id": "findings_list", "component": "List",    "dataBinding": "/findings",   "componentId": "finding_row" },
-        { "id": "finding_row",   "component": "Row",     "alignment": "spaceBetween",  "children": { "explicitList": ["col_name", "col_flag"] } },
-        { "id": "col_name",      "component": "Text",    "text": { "path": "/column" } },
-        { "id": "col_flag",      "component": "Text",    "text": { "path": "/flag" } }
+        { "id": "root",          "component": "Column", "justify": "start",       "children": ["title", "findings_list"] },
+        { "id": "title",         "component": "Text",   "text": "EDA Findings",   "variant": "h3" },
+        { "id": "findings_list", "component": "List",   "children": { "componentId": "finding_row", "path": "/findings" } },
+        { "id": "finding_row",   "component": "Row",    "justify": "spaceBetween", "children": ["col_name", "col_flag"] },
+        { "id": "col_name",      "component": "Text",   "text": { "path": "/column" } },
+        { "id": "col_flag",      "component": "Text",   "text": { "path": "/flag" } }
       ]
     }
   },
@@ -27,9 +27,9 @@
       "path": "/",
       "value": {
         "findings": [
-          { "column": "price",   "flag": "right_skewed", "note": "log candidate" },
-          { "column": "income",  "flag": "right_skewed", "note": "log candidate" },
-          { "column": "balance", "flag": "right_skewed", "note": "" }
+          { "column": "price",   "flag": "right_skewed" },
+          { "column": "income",  "flag": "right_skewed" },
+          { "column": "balance", "flag": "right_skewed" }
         ]
       }
     }
@@ -46,15 +46,15 @@
     "updateComponents": {
       "surfaceId": "eda-action",
       "components": [
-        { "id": "root",           "component": "Card",   "child": "card_body" },
-        { "id": "card_body",      "component": "Column", "alignment": "start", "children": { "explicitList": ["heading", "rationale", "buttons"] } },
-        { "id": "heading",        "component": "Text",   "text": { "path": "/prompt" },    "variant": "h3" },
-        { "id": "rationale",      "component": "Text",   "text": { "path": "/rationale" } },
-        { "id": "buttons",        "component": "Row",    "alignment": "end", "children": { "explicitList": ["confirm", "dismiss"] } },
-        { "id": "confirm_label",  "component": "Text",   "text": "Apply transform" },
-        { "id": "confirm",        "component": "Button", "child": "confirm_label", "variant": "primary",  "action": { "event": { "name": "confirm_transform", "context": { "column": "price", "transform": "log" } } } },
-        { "id": "dismiss_label",  "component": "Text",   "text": "Not now" },
-        { "id": "dismiss",        "component": "Button", "child": "dismiss_label",  "variant": "default", "action": { "event": { "name": "dismiss", "context": { "column": "price" } } } }
+        { "id": "root",          "component": "Card",   "child": "card_body" },
+        { "id": "card_body",     "component": "Column", "justify": "start", "children": ["heading", "rationale", "buttons"] },
+        { "id": "heading",       "component": "Text",   "text": { "path": "/prompt" },    "variant": "h3" },
+        { "id": "rationale",     "component": "Text",   "text": { "path": "/rationale" } },
+        { "id": "buttons",       "component": "Row",    "justify": "end", "children": ["confirm", "dismiss"] },
+        { "id": "confirm_label", "component": "Text",   "text": "Apply transform" },
+        { "id": "confirm",       "component": "Button", "child": "confirm_label", "variant": "primary",  "action": { "event": { "name": "confirm_transform" } } },
+        { "id": "dismiss_label", "component": "Text",   "text": "Not now" },
+        { "id": "dismiss",       "component": "Button", "child": "dismiss_label",  "variant": "default", "action": { "event": { "name": "dismiss" } } }
       ]
     }
   },
@@ -81,15 +81,15 @@
     "updateComponents": {
       "surfaceId": "training-verdict",
       "components": [
-        { "id": "root",        "component": "Card",   "child": "card_body" },
-        { "id": "card_body",   "component": "Column", "alignment": "start", "children": { "explicitList": ["heading", "reason", "buttons"] } },
-        { "id": "heading",     "component": "Text",   "text": { "path": "/heading" }, "variant": "h3" },
-        { "id": "reason",      "component": "Text",   "text": { "path": "/reason" } },
-        { "id": "buttons",     "component": "Row",    "alignment": "end", "children": { "explicitList": ["stop", "keep"] } },
-        { "id": "stop_label",  "component": "Text",   "text": "Stop training" },
-        { "id": "stop",        "component": "Button", "child": "stop_label", "variant": "primary",  "action": { "event": { "name": "stop_training",  "context": { "run_id": "demo-overfit-001", "step": 350, "verdict": "overfitting" } } } },
-        { "id": "keep_label",  "component": "Text",   "text": "Keep going" },
-        { "id": "keep",        "component": "Button", "child": "keep_label",  "variant": "default", "action": { "event": { "name": "keep_training",  "context": { "run_id": "demo-overfit-001", "step": 350, "verdict": "overfitting" } } } }
+        { "id": "root",       "component": "Card",   "child": "card_body" },
+        { "id": "card_body",  "component": "Column", "justify": "start", "children": ["heading", "reason", "buttons"] },
+        { "id": "heading",    "component": "Text",   "text": { "path": "/heading" }, "variant": "h3" },
+        { "id": "reason",     "component": "Text",   "text": { "path": "/reason" } },
+        { "id": "buttons",    "component": "Row",    "justify": "end", "children": ["stop", "keep"] },
+        { "id": "stop_label", "component": "Text",   "text": "Stop training" },
+        { "id": "stop",       "component": "Button", "child": "stop_label", "variant": "primary",  "action": { "event": { "name": "stop_training" } } },
+        { "id": "keep_label", "component": "Text",   "text": "Keep going" },
+        { "id": "keep",       "component": "Button", "child": "keep_label",  "variant": "default", "action": { "event": { "name": "keep_training" } } }
       ]
     }
   },
