@@ -10,7 +10,7 @@ DataDive turns tabular datasets into an immersive room you can explore in VR. Yo
 
 ## Architecture
 
-![DataDive system architecture](docs/assets/architecture.png)
+<img width="1376" height="768" alt="Gemini_Generated_Image_qgy4moqgy4moqgy4 (1)" src="https://github.com/user-attachments/assets/03084ef8-47d6-44bd-b399-c2ac157b081d" />
 
 ```
 Meta Quest (WebXR)          Spectator dashboard (Next.js + CopilotKit)
